@@ -7,19 +7,23 @@
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include <array>
 #include "utilities.hpp"
 
 /// The length and width of a bingo board.
 const int GRID_SIZE = 5;
+/// A 5x5 array of some kind of data.
+template <typename T>
+using grid = std::array<std::array<T, GRID_SIZE>, GRID_SIZE>;
 
 /// \brief A bingo card.
 class Board {
 public:
     /// \brief Constructs a new, empty bingo board.
     /// You should then fill it in by extracting it from an input stream.
-    /// \post This board is effectively uninitialized, which feels bad.
+    /// \post This is an empty board containing default values.
     Board () 
-    : numbers {}, marked {} {
+    : m_numbers {}, m_marked {} {
     }
 
     /// \brief Marks any copy of a number that exists on this board.
@@ -28,8 +32,8 @@ public:
     void markNumber (int number) {
         for (unsigned int row {0U}; row < GRID_SIZE; ++row) {
             for (unsigned int col {0U}; col < GRID_SIZE; ++col) {
-                if (numbers.at (row).at (col) == number) {
-                    marked[row][col] = true;
+                if (m_numbers.at (row).at (col) == number) {
+                    m_marked[row][col] = true;
                 }
             }
         }
@@ -41,7 +45,7 @@ public:
         for (unsigned int row {0U}; row < GRID_SIZE; ++row) {
             bool allMarked = true;
             for (unsigned int col {0U}; col < GRID_SIZE; ++col) {
-                if (!marked.at (row).at (col)) {
+                if (!m_marked.at (row).at (col)) {
                     allMarked = false;
                 }
             }
@@ -52,7 +56,7 @@ public:
         for (unsigned int col {0U}; col < GRID_SIZE; ++col) {
             bool allMarked = true;
             for (unsigned int row {0U}; row < GRID_SIZE; ++row) {
-                if (!marked.at (row).at (col)) {
+                if (!m_marked.at (row).at (col)) {
                     allMarked = false;
                 }
             }
@@ -69,18 +73,22 @@ public:
         int sum {0};
         for (unsigned int row {0U}; row < GRID_SIZE; ++row) {
             for (unsigned int col {0U}; col < GRID_SIZE; ++col) {
-                if (!marked.at (row).at (col)) {
-                    sum += numbers.at (row).at (col);
+                if (!m_marked.at (row).at (col)) {
+                    sum += m_numbers.at (row).at (col);
                 }
             }
         }
         return sum;
     }
 
+    friend std::istream& operator>> (std::istream&in, Board& board);
+
+private:
+
     /// A 5x5 matrix of numbers.
-    std::vector<std::vector<int>> numbers;
+    grid<int> m_numbers;
     /// Whether or not each spot on the card has been marked.
-    std::vector<std::vector<bool>> marked;
+    grid<bool> m_marked;
 };
 
 /// \brief Extracts a board from an input stream.
@@ -89,14 +97,10 @@ public:
 /// \return The same input stream.
 /// \post Twenty-five integers have been extracted from the input stream and stored in the board.
 std::istream& operator>> (std::istream& in, Board& board) {
-    board.numbers.clear ();
-    board.marked.clear ();
     for (unsigned int row {0U}; row < GRID_SIZE; ++row) {
-        board.numbers.push_back (std::vector<int> ());
-        board.marked.push_back (std::vector<bool> ());
         for (unsigned int col {0U}; col < GRID_SIZE; ++col) {
-            board.numbers.at (row).push_back (read<int> (in));
-            board.marked.at (row).push_back (false);
+            board.m_numbers[row][col] = read<int> (in);
+            board.m_marked[row][col] = false;
         }
     }
     return in;
@@ -168,6 +172,15 @@ public:
 
     }
 
+    /// \brief Gets one of the numbers that will be called in the bingo game.
+    /// \param[in] index The 0-based index of which one will be called.
+    /// \return That number.
+    int getCalledNumber (unsigned int index) const {
+        return calledNumbers.at (index);
+    }
+
+private:
+
     /// The sequence of numbers that will be called in the bingo game.
     std::vector<int> calledNumbers;
     /// The collection of active bingo boards.
@@ -187,7 +200,7 @@ int main () {
         problem.markNumber (index);
         winner = problem.getWinner ();
         if (winner != NULL) {
-            std::cout << winner->getUnmarkedSum () * problem.calledNumbers[index] << "\n";
+            std::cout << winner->getUnmarkedSum () * problem.getCalledNumber (index) << "\n";
         }
         ++index;
     }
@@ -198,7 +211,7 @@ int main () {
         problem.markNumber (index);
         winner = problem.getLastWinner ();
         if (winner != NULL) {
-            std::cout << winner->getUnmarkedSum () * problem.calledNumbers[index] << "\n";
+            std::cout << winner->getUnmarkedSum () * problem.getCalledNumber (index) << "\n";
         }
         ++index;
     }
