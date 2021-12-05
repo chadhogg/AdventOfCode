@@ -88,7 +88,7 @@ public:
 /// \param[out] board The board to re-initialize with new values from the input stream.
 /// \return The same input stream.
 /// \post Twenty-five integers have been extracted from the input stream and stored in the board.
-std::istream& operator<< (std::istream& in, Board& board) {
+std::istream& operator>> (std::istream& in, Board& board) {
     board.numbers.clear ();
     board.marked.clear ();
     for (unsigned int row {0U}; row < GRID_SIZE; ++row) {
@@ -119,7 +119,7 @@ public:
         }
 
         Board board;
-        while (in << board) {
+        while (in >> board) {
             boards.push_back (Board (board));
         }
     }
