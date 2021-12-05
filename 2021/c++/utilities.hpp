@@ -8,10 +8,15 @@
 #include <vector>
 
 template<typename T>
-T read () {
+T read (std::istream& in) {
     T temp;
-    std::cin >> temp;
+    in >> temp;
     return temp;
+}
+
+template<typename T>
+T read () {
+    return read<T> (std::cin);
 }
 
 template<typename T>
