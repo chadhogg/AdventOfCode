@@ -113,18 +113,18 @@ public:
     /// \param[inout] in The input stream.
     /// \post A line of called numbers and however many board representations exist have been extracted from the input stream and stored here.
     Problem (std::istream & in)
-    : calledNumbers {}, boards {} {
+    : m_calledNumbers {}, m_boards {} {
         std::string numbersLine {read<std::string> (in)};
         std::stringstream stream;
         stream << numbersLine;
         std::string temp;
         while (getline (stream, temp, ',')) {
-            calledNumbers.push_back (atoi (temp.c_str ()));
+            m_calledNumbers.push_back (atoi (temp.c_str ()));
         }
 
         Board board;
         while (in >> board) {
-            boards.push_back (Board (board));
+            m_boards.push_back (Board (board));
         }
     }
 
@@ -132,8 +132,8 @@ public:
     /// \param[in] index The 0-based index of which number should be marked.
     /// \post All boards that contained that number have it marked.
     void markNumber (unsigned int index) {
-        int number {calledNumbers[index]};
-        for (Board & board : boards) {
+        int number {m_calledNumbers[index]};
+        for (Board & board : m_boards) {
             board.markNumber (number);
         }
     }
@@ -142,7 +142,7 @@ public:
     /// \return A pointer to the winning board, or NULL if there are none yet.
     ///   Note that this points to an object that is owned and managed by this problem.
     const Board* getWinner () const {
-        for (Board const& board : boards) {
+        for (Board const& board : m_boards) {
             if (board.hasWon ()) {
                 return &board;
             }
@@ -155,13 +155,13 @@ public:
     ///   there is more than one remaining board.
     /// \post Any board that is winning and not the only one has been discarded.
     const Board* getLastWinner () {
-        for (auto it = boards.begin (); it != boards.end (); /* intentionally blank */) {
+        for (auto it = m_boards.begin (); it != m_boards.end (); /* intentionally blank */) {
             if ((*it).hasWon ()) {
-                if (boards.size () == 1) {
+                if (m_boards.size () == 1) {
                     return &(*it);
                 }
                 else {
-                    boards.erase (it);
+                    m_boards.erase (it);
                 }
             }
             else {
@@ -176,15 +176,15 @@ public:
     /// \param[in] index The 0-based index of which one will be called.
     /// \return That number.
     int getCalledNumber (unsigned int index) const {
-        return calledNumbers.at (index);
+        return m_calledNumbers.at (index);
     }
 
 private:
 
     /// The sequence of numbers that will be called in the bingo game.
-    std::vector<int> calledNumbers;
+    std::vector<int> m_calledNumbers;
     /// The collection of active bingo boards.
-    std::vector<Board> boards;
+    std::vector<Board> m_boards;
 };
 
 
