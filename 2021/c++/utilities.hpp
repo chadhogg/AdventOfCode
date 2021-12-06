@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <vector>
+#include <array>
 
 template<typename T>
 T read (std::istream& in) {
@@ -36,8 +37,8 @@ std::ostream& operator<< (std::ostream& out, std::vector<T> const& vec) {
     return out;
 }
 
-template<typename T>
-std::ostream& operator<< (std::ostream& out, std::array<T, 9> const& vec) {
+template<typename T, unsigned int N>
+std::ostream& operator<< (std::ostream& out, std::array<T, N> const& vec) {
     if (!vec.empty ()) {
         out << "[";
         bool first {true};
