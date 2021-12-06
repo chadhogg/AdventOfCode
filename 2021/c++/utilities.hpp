@@ -36,5 +36,21 @@ std::ostream& operator<< (std::ostream& out, std::vector<T> const& vec) {
     return out;
 }
 
+template<typename T>
+std::ostream& operator<< (std::ostream& out, std::array<T, 9> const& vec) {
+    if (!vec.empty ()) {
+        out << "[";
+        bool first {true};
+        for (T const& val : vec) {
+            if (!first) {
+                out << ", ";
+            }
+            out << val;
+            first = false;
+        }
+        out << "]";
+    }
+    return out;
+}
 
 #endif//AOC_2021_UTILITIES_HPP
