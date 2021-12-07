@@ -1,4 +1,4 @@
-/// \file 2021Day05.cpp
+/// \file 2021Day06.cpp
 /// \author Chad Hogg
 /// \brief My solution to https://adventofcode.com/2021/day/6.
 
