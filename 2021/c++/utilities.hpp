@@ -37,12 +37,12 @@ std::ostream& operator<< (std::ostream& out, std::vector<T> const& vec) {
     return out;
 }
 
-template<typename T, unsigned int N>
-std::ostream& operator<< (std::ostream& out, std::array<T, N> const& vec) {
-    if (!vec.empty ()) {
+template<typename T, std::size_t N>
+std::ostream& operator<< (std::ostream& out, std::array<T, N> const& arr) {
+    if (!arr.empty ()) {
         out << "[";
         bool first {true};
-        for (T const& val : vec) {
+        for (T const& val : arr) {
             if (!first) {
                 out << ", ";
             }
