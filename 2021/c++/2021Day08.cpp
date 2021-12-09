@@ -15,21 +15,34 @@
 
 #include "utilities.hpp"
 
+/// The number of segments in a digit.
 constexpr unsigned int NUM_SEGMENTS = 7;
+/// The number of unique digits that can be displayed.
 constexpr unsigned int NUM_DIGITS = 10;
+/// The number of digits in a reading.
 constexpr unsigned int DISPLAY_LENGTH = 4;
 
+/// A listing of which segments (a-g) are lit.
+/// Should always be sorted in alpabetical order.
+/// Much of this code would be simpler if this were instead std::set<char>, but std::string gives me a lot for free.
 using SignalPattern = std::string;
 
+/// One of the 4 x 7-segment displays we are working with.
 struct Display {
+    /// The 10 unique signal patterns we have seen.
     std::array<SignalPattern, NUM_DIGITS> patterns;
+    /// The sequence of 4 signal patterns currently displayed.
     std::array<SignalPattern, DISPLAY_LENGTH> shown;
 };
 
+/// A problem to work on, which is just a collection of displays.
 using Problem = std::vector<Display>;
 
-using SignalIdentity = std::map<SignalPattern, unsigned int>;
 
+/// \brief Reads a display from standard input.
+/// \param[inout] is An input stream to work with.
+/// \param[out] display The display that should be reinitialized.
+/// \return The same input stream.
 std::istream& operator>> (std::istream& is, Display& display) {
     for (unsigned int index {0U}; index < NUM_DIGITS; ++index) {
         std::string str = read<std::string> (is);
@@ -50,38 +63,8 @@ std::istream& operator>> (std::istream& is, Display& display) {
     return is;
 }
 
-
-/*
-using SignalPattern = bool[NUM_SEGMENTS];
-
-struct Display {
-    SignalPattern patterns[NUM_DIGITS];
-    SignalPattern shown[DISPLAY_LENGTH];
-};
-
-using Problem = std::vector<Display>;
-
-std::istream& operator>> (std::istream& is, Display& display) {
-    for (unsigned int index {0U}; index < NUM_DIGITS; ++index) {
-        std::string str = read<std::string> (is);
-        for (unsigned int sindex {0U}; sindex < str.size (); ++sindex) {
-            assert (display.patterns[index][str.at (sindex) - 'a'] == false);
-            display.patterns[index][str.at (sindex) - 'a'] = true;
-        }
-    }
-    std::string pipe = read<std::string> ();
-    assert (pipe == "|");
-    for (unsigned int index {0U}; index < DISPLAY_LENGTH; ++index) {
-        std::string str = read<std::string> (is);
-        for (unsigned int sindex {0U}; sindex < str.size (); ++sindex) {
-            assert (display.shown[index][str.at (sindex) - 'a'] == false);
-            display.shown[index][str.at (sindex) - 'a'] = true;
-        }
-    }
-    return is;
-}
-*/
-
+/// \brief Reads a problem from standard input.
+/// \return The problem to solve.
 Problem getInput () {
     Problem prob;
     Display display;
@@ -91,31 +74,14 @@ Problem getInput () {
     return prob;
 }
 
-SignalIdentity identifySignals (Display const& display) {
-    SignalIdentity identity;
-    for (std::string const& str : display.patterns) {
-        if (str.size () == 2) {
-            identity[str] = 1;
-        }
-        else if (str.size () == 3) {
-            identity[str] = 7;
-        }
-        else if (str.size () == 4) {
-            identity[str] = 4;
-        }
-        else if (str.size () == 7) {
-            identity[str] = 8;
-        }
-    }
-    return identity;
-}
-
+/// \brief Solves part 1 of the problem (counting the number of easily identifiable digits in all of the displays combined).
+/// \param[in] prob The problem.
+/// \post The answer has been printed.
 void part1 (Problem const& prob) {
     unsigned int count {0U};
     for (Display const& disp : prob) {
-        SignalIdentity ident = identifySignals (disp);
-        for (SignalPattern out : disp.shown) {
-            if (ident.count (out) == 1) {
+        for (SignalPattern pattern : disp.shown) {
+            if (pattern.size () == 2 || pattern.size () == 3 || pattern.size () == 4 || pattern.size () == 7) {
                 ++count;
             }
         }
@@ -123,6 +89,10 @@ void part1 (Problem const& prob) {
     std::cout << count << "\n";
 }
 
+/// \brief Finds the signal patterns that represent the easily identifiable digits.
+/// \param[in] disp A display.
+/// \param[in] num The digit whose pattern we are searching for, which must be 1, 4, 7, or 8.
+/// \return The pattern that represents that digit.
 SignalPattern const& findPattern (Display const& disp, unsigned int num) {
     for (SignalPattern const& sig : disp.patterns) {
         if (num == 1 && sig.size () == 2) {
@@ -142,84 +112,10 @@ SignalPattern const& findPattern (Display const& disp, unsigned int num) {
 }
 
 
-
-
-/*
-
-SignalPattern make9 (SignalPattern const& four, char a) {
-    SignalPattern nine = four;
-    nine += a;
-    std::sort (nine.begin (), nine.end ());
-    return nine;
-}
-
-SignalPattern determine0 (SignalPattern const& one, Display const& display) {
-    bool found = false;
-    SignalPattern ret;
-    for (SignalPattern const& sig : display.patterns) {
-        if (sig.size () == 6 && sig.find (one.at (0)) != std::string::npos && sig.find (one.at (1)) != std::string::npos) {
-            if (found) {
-                std::cout << ret << "\n";
-                std::cout << sig << "\n";
-                std::cout << one << "\n";
-                throw std::runtime_error ("Find more than one size-6 pattern that contained all elements of 1.");
-            }
-            found = true;
-            ret = sig;
-        }
-    }
-    if (!found) {
-        throw std::runtime_error("Couldn't find 0.");
-    }
-    return ret;
-}
-
-SignalPattern determine6 (SignalPattern const& zero, Display const& display) {
-    bool found = false;
-    SignalPattern ret;
-    for (SignalPattern const& sig : display.patterns) {
-        if (sig.size () == 6 && sig != zero) {
-            if (found) {
-                throw std::runtime_error ("Found more than one size-6 pattern that wasn't 0.");
-            }
-            found = true;
-            ret = sig;
-        }
-    }
-    if (!found) {
-        throw std::runtime_error("Couldn't find 6.");
-    }
-    return ret;
-}
-
-SignalPattern determine5 (SignalPattern const& nine, SignalPattern const& one, Display const& display) {
-    bool found = false;
-    SignalPattern ret;
-    for (SignalPattern const& sig : display.patterns) {
-        if (sig.size () == 5 && sig != nine && sig.find (one.at (0)) != std::string::npos && sig.find (one.at (1)) != std::string::npos) {
-            if (found) {
-                throw std::runtime_error ("Found multiple size-5 signals that were'nt nine but contained all parts of 1.");
-            }
-            found = true;
-            ret = sig;
-        }
-    }
-    if (!found) {
-        throw std::runtime_error ("Couldn't find 5.");
-    }
-    return ret;
-}
-
-*/
-
-
-
-
-
-
-
-
-
+/// \brief Finds the single letter that is in one signal pattern but not another.
+/// \param[in] hasIt A signal pattern that contains a number of letters.
+/// \param[in] missingIt Another signal pattern that is missing exactly one letter from hasIt.
+/// \return The missing letter.
 char missingLetter (SignalPattern const& hasIt, SignalPattern const& missingIt) {
     bool found = false;
     char ret = ' ';
@@ -238,7 +134,10 @@ char missingLetter (SignalPattern const& hasIt, SignalPattern const& missingIt) 
     return ret;
 }
 
-
+/// \brief Determines whether or not one signal pattern is a superset of another.
+/// \param[in] super The potential superset.
+/// \param[in] sub The potential subset.
+/// \return True if every character in sub is also in super.
 bool containsAll (SignalPattern const& super, SignalPattern const& sub) {
     for (char c : sub) {
         if (super.find (c) == std::string::npos) {
@@ -248,24 +147,12 @@ bool containsAll (SignalPattern const& super, SignalPattern const& sub) {
     return true;
 }
 
-SignalPattern findOnlySupersetOfSize (Display const& display, SignalPattern const& sub, size_t size) {
-    bool found = false;
-    SignalPattern ret;
-    for (SignalPattern const& patt : display.patterns) {
-        if (patt.size () == size && containsAll (patt, sub)) {
-            if (found) {
-                throw std::runtime_error ("Found multiple size " + std::to_string (size) + " patterns that were supersets of " + sub + ": " + ret + " and " + patt);
-            }
-            found = true;
-            ret = patt;
-        }
-    }
-    if (!found) {
-        throw std::runtime_error ("Could not find a size " + std::to_string (size) + " pattern that is a superset of " + sub);
-    }
-    return ret;
-}
-
+/// \brief Finds the only signal pattern of a certain size that is a superset of some other signal pattern, and isn't excluded.
+/// \param[in] display The display.
+/// \param[in] sub The signal pattern that it should be a superset of.
+/// \param[in] size The length the signal pattern should have.
+/// \param[in] exclusions A set of signal patterns that should not be considered potential solutions.
+/// \return The only signal pattern meeting those critera.
 SignalPattern findOnlySuperOfSizeExcluding (Display const& display, SignalPattern const& sub, size_t size, std::set<SignalPattern> const& exclusions) {
     bool found = false;
     SignalPattern ret;
@@ -284,6 +171,12 @@ SignalPattern findOnlySuperOfSizeExcluding (Display const& display, SignalPatter
     return ret;
 }
 
+/// \brief Finds the only signal pattern of a certain size that is a subset of some other signal pattern, and isn't excluded.
+/// \param[in] display The display.
+/// \param[in] super The signal pattern that it should be a subset of.
+/// \param[in] size The length the signal pattern should have.
+/// \param[in] exclusions A set of signal patterns that should not be considered potential solutions.
+/// \return The only signal pattern meeting those critera.
 SignalPattern findOnlySubOfSizeExcluding (Display const& display, SignalPattern const& super, size_t size, std::set<SignalPattern> const& exclusions) {
     bool found = false;
     SignalPattern ret;
@@ -303,7 +196,9 @@ SignalPattern findOnlySubOfSizeExcluding (Display const& display, SignalPattern 
 }
 
 
-
+/// \brief Determines which signal pattern is used for each digit.
+/// \param[in] display The display.
+/// \return A map of digit to signal pattern.
 std::map<unsigned int, SignalPattern> decode (Display const& display) {
     std::map<unsigned int, SignalPattern> intToPattern;
 
@@ -314,7 +209,7 @@ std::map<unsigned int, SignalPattern> decode (Display const& display) {
     intToPattern[8] = findPattern (display, 8);
 
     // ii: The only length-6 pattern that contains all of #4 would be #9.
-    intToPattern[9] = findOnlySupersetOfSize (display, intToPattern[4], 6);
+    intToPattern[9] = findOnlySuperOfSizeExcluding (display, intToPattern[4], 6, {});
 
     // Note: At this point we can figure out which signal is G, but I don't think that helps us.
 
@@ -336,6 +231,10 @@ std::map<unsigned int, SignalPattern> decode (Display const& display) {
     return intToPattern;
 }
 
+/// \brief Determines the value of a display.
+/// \param[in] display A broken display.
+/// \param[in] mapping A mapping of signal patterns in the display to digits.
+/// \return The numeric value of the display.
 unsigned int interpret (Display const& display, std::map<unsigned int, SignalPattern> const& mapping) {
     unsigned int total {0U};
     unsigned int factor {1000U};
@@ -351,6 +250,9 @@ unsigned int interpret (Display const& display, std::map<unsigned int, SignalPat
     return total;
 }
 
+/// \brief Solves part of the problem (summing the values shown on all displays).
+/// \param[in] prob The problem to solve.
+/// \post The solution has been printed.
 void part2 (Problem const& prob) {
     unsigned long total {0UL};
     for (Display const& disp : prob) {
