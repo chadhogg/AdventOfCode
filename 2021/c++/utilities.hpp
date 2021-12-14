@@ -54,4 +54,41 @@ std::ostream& operator<< (std::ostream& out, std::array<T, N> const& arr) {
     return out;
 }
 
+/// A position in a 2-D grid.
+struct Coordinate {
+    /// Vertical position -- top is 0, increases as you go down.
+    int row;
+    /// Horizontal position -- left is 0, increases as you go right.
+    int col;
+
+    /// \brief Constructs a coordinate.
+    /// \param[in] r The row.
+    /// \param[in] c The col.
+    /// \post Those values are copied to the fields.
+    /// \note I needed to write this to avoid a compiler error, and I'm not sure why.
+    Coordinate (int r, int c) 
+    : row (r), col (c)
+    {
+    }
+
+    /// Checks whether or not two coordinates are the same.
+    /// \param[in] other Another coordinate.
+    /// \return True if this coordinate matches the other.
+    bool operator== (Coordinate const& other) const {
+        return row == other.row && col == other.col;
+    }
+
+};
+
+/// Hashes a coordinate.
+/// \param[in] loc A coordinate.
+/// \return That coordinate's hash value.
+template<>
+struct std::hash<Coordinate> {
+    std::size_t operator()(Coordinate const& loc) const {
+        return loc.row + loc.col * 1234567;
+    }
+};
+
+
 #endif//AOC_2021_UTILITIES_HPP
