@@ -103,6 +103,11 @@ struct std::hash<Coordinate> {
     }
 };
 
+std::ostream& operator<< (std::ostream & out, Coordinate const& c) {
+    out << "(" << c.row << ", " << c.col << ")";
+    return out;
+}
+
 /// \brief An object that hashes pairs.
 template<typename A, typename B>
 struct std::hash<std::pair<A, B>> {
