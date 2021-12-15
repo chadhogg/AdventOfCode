@@ -8,6 +8,9 @@
 #include <vector>
 #include <array>
 
+/// Reads a value from an input stream, but doesn't tell you whether or not it succeeded.
+/// \param[in] in The stream.
+/// \return The value that was read.
 template<typename T>
 T read (std::istream& in) {
     T temp;
@@ -15,11 +18,17 @@ T read (std::istream& in) {
     return temp;
 }
 
+/// Reads a value from standard input, but doesn't tell you whether or not it succeeded.
+/// \return The value that was read.
 template<typename T>
 T read () {
     return read<T> (std::cin);
 }
 
+/// \brief Prints the contents of a vector to an output stream.
+/// \param[in] out The stream.
+/// \param[in] vec The vector.
+/// \return The stream.
 template<typename T>
 std::ostream& operator<< (std::ostream& out, std::vector<T> const& vec) {
     if (!vec.empty ()) {
@@ -37,6 +46,10 @@ std::ostream& operator<< (std::ostream& out, std::vector<T> const& vec) {
     return out;
 }
 
+/// \brief Prints the contents of an array to an output stream.
+/// \param[in] out The stream.
+/// \param[in] arr The array.
+/// \return The stream.
 template<typename T, std::size_t N>
 std::ostream& operator<< (std::ostream& out, std::array<T, N> const& arr) {
     if (!arr.empty ()) {
@@ -89,6 +102,20 @@ struct std::hash<Coordinate> {
         return loc.row + loc.col * 1234567;
     }
 };
+
+/// \brief An object that hashes pairs.
+template<typename A, typename B>
+struct std::hash<std::pair<A, B>> {
+    /// \brief Hashes a pair of things that are already themselves hashable.
+    /// \param[in] thing A pair that should be hashed.
+    /// \return That pair's hash value.
+    std::size_t operator()(std::pair<A, B> const& thing) const {
+        auto first = std::hash<A>() (thing.first);
+        auto second = std::hash<B>() (thing.second);
+        return first + second * 1234567U;
+    }
+};
+
 
 
 #endif//AOC_2021_UTILITIES_HPP
