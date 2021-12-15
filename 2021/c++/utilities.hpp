@@ -103,6 +103,11 @@ struct std::hash<Coordinate> {
     }
 };
 
+/// \brief Inserts a coordinate into an output stream.
+/// \param[inout] out The stream.
+/// \param[in] c The coordinate.
+/// \return The stream.
+/// \post The coordinate has been inserted into the output stream.
 std::ostream& operator<< (std::ostream & out, Coordinate const& c) {
     out << "(" << c.row << ", " << c.col << ")";
     return out;
