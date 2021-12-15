@@ -20,11 +20,14 @@ using Path = std::vector<Coordinate>;
 
 struct CoordinatePlus {
     CoordinatePlus (Coordinate c) 
-        : coord {c}, cheapestPath {}, totalRisk {0} {
+        : coord {c}, cheapestPath {}, riskToGetHere {0}, estimatedRiskToGoal {0} {
     }
     Coordinate coord;
     Path cheapestPath;
-    Risk totalRisk;
+    Risk riskToGetHere;
+    Risk estimatedRiskToGoal;
+
+    inline Risk getRisk () const { return riskToGetHere + estimatedRiskToGoal; }
 };
 
 constexpr Risk MAX_RISK = 9U;
@@ -45,53 +48,40 @@ Grid<Risk> getInput () {
 
 Risk heuristicCost (Coordinate const& current, Coordinate const& goal) {
     Risk manhattan = std::abs (current.row - goal.row) + std::abs (current.col - goal.col);
-    return manhattan * MAX_RISK;
+    return manhattan * MIN_RISK;
 }
 
 class CoordinatePlusComparator {
 public:
-    Coordinate goal;
-    
     inline bool operator() (CoordinatePlus const& x, CoordinatePlus const& y) const {
-        Risk xCost = x.totalRisk + heuristicCost (x.cheapestPath.back (), goal);
-        Risk yCost = y.totalRisk + heuristicCost (y.cheapestPath.back (), goal);
-        return xCost < yCost;
+        return x.getRisk () > y.getRisk ();
     }
 };
 
-static CoordinatePlusComparator comp {{0, 0}};
+static CoordinatePlusComparator comp {};
 
 CoordinatePlus findCheapestPath (Grid<Risk> const& problem) {
-    comp.goal.row = problem.size () - 1;
-    comp.goal.col = problem.at (0).size () - 1;
+    Coordinate goal {(int)problem.size () - 1, (int)problem.at (0).size () - 1};
 
-    comp.goal.row = 1;
-    comp.goal.col = 2;
     std::vector<CoordinatePlus> open;
     std::unordered_map<Coordinate, Risk> costs;
     
     CoordinatePlus start {{0, 0}};
     start.cheapestPath.push_back ({0, 0});
+    start.estimatedRiskToGoal = heuristicCost (start.coord, goal);
     open.push_back (start);
-    costs.insert (std::make_pair (start.coord, heuristicCost (start.coord, comp.goal)));
+    costs.insert (std::make_pair (start.coord, start.getRisk ()));
     
     while (!open.empty ()) {
         std::pop_heap (open.begin (), open.end (), comp);
         CoordinatePlus current {open.back ()};
         open.pop_back ();
 
-        std::cout << "Examining " << current.cheapestPath << " [" << current.totalRisk << "]\n";
-
-        if (current.coord == comp.goal) {
-            std::cout << "Current costs: \n";
-            for (auto const& p : costs) {
-                std::cout << p.first << ": " << p.second << "\n";
-            }
+        if (current.coord == goal) {
             return current;
         }
 
-        if (current.totalRisk + heuristicCost (current.coord, comp.goal) > costs.at (current.coord)) {
-            std::cout << "Discarding because we can get there with cost " << current.totalRisk << "\n";
+        if (current.getRisk () > costs.at (current.coord)) {
             continue; // already found a cheaper route here
         }
 
@@ -112,15 +102,12 @@ CoordinatePlus findCheapestPath (Grid<Risk> const& problem) {
             CoordinatePlus next {n};
             next.cheapestPath = current.cheapestPath;
             next.cheapestPath.push_back (n);
-            next.totalRisk = current.totalRisk + problem.at (n.row).at (n.col);
-            if (costs.find (n) == costs.end () || costs.at (n) > next.totalRisk + heuristicCost (next.coord, comp.goal)) {
+            next.riskToGetHere = current.riskToGetHere + problem.at (n.row).at (n.col);
+            next.estimatedRiskToGoal = heuristicCost (next.coord, goal);
+            if (costs.find (n) == costs.end () || costs.at (n) > next.getRisk ()) {
                 open.push_back (next);
                 std::push_heap (open.begin (), open.end (), comp);
-                costs[n] = next.totalRisk + heuristicCost (next.coord, comp.goal);
-                std::cout << "Adding neighbor " << next.cheapestPath << " [" << next.totalRisk << "]\n";
-            }
-            else {
-                std::cout << "Skipping neighbor " << next.cheapestPath << " [" << next.totalRisk << "] because " << next.totalRisk + heuristicCost (next.coord, comp.goal) << " is worse than " << costs.at (next.coord) << "\n";
+                costs[n] = next.getRisk ();
             }
         }
 
@@ -134,6 +121,6 @@ CoordinatePlus findCheapestPath (Grid<Risk> const& problem) {
 int main () {
     Grid<Risk> problem = getInput ();
     CoordinatePlus answer1 = findCheapestPath (problem);
-    std::cout << answer1.totalRisk << "\n";
+    std::cout << answer1.riskToGetHere << "\n";
     return 0;
 }
