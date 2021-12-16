@@ -272,8 +272,8 @@ private:
 /// \return A packet.
 /// \post The relevant bits have been extracted from the bit stream.
 std::unique_ptr<Packet> parse (Bits & bits) {
-    unsigned int version = parseNumber (bits, 3);
-    unsigned int typeID = parseNumber (bits, 3);
+    unsigned int version = parseNumber (bits, VERSION_WIDTH);
+    unsigned int typeID = parseNumber (bits, TYPEID_WIDTH);
     if (typeID == TYPE_LITERAL) {
         return std::unique_ptr<Packet> (new LiteralPacket (version, typeID, bits));
     }
