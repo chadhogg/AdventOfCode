@@ -179,7 +179,22 @@ public:
         return false;
     }
     virtual unsigned long magnitude () const { return 3 * m_left->magnitude () + 2 * m_right->magnitude (); }
-
+    SnailfishPair* clone (SnailfishPair* newParent) const {
+        SnailfishPair* copy = new SnailfishPair (newParent, NULL, NULL);
+        if (dynamic_cast<SnailfishPair*> (m_left)) {
+            copy->m_left = dynamic_cast<SnailfishPair*> (m_left)->clone (copy);
+        }
+        else {
+            copy->m_left = new SnailfishLiteral (copy, dynamic_cast<SnailfishLiteral*> (m_left)->m_value);
+        }
+        if (dynamic_cast<SnailfishPair*> (m_right)) {
+            copy->m_right = dynamic_cast<SnailfishPair*> (m_right)->clone (copy);
+        }
+        else {
+            copy->m_right = new SnailfishLiteral (copy, dynamic_cast<SnailfishLiteral*> (m_right)->m_value);
+        }
+        return copy;
+    }
 public:
     Snailfish* m_left;
     Snailfish* m_right;
@@ -228,20 +243,46 @@ std::vector<SnailfishPair*> getInput () {
     return numbers;
 }
 
-SnailfishPair* addAndReduce (SnailfishPair* first, SnailfishPair* second) {
-    SnailfishPair* result = new SnailfishPair (NULL, first, second);
-    first->m_parent = result;
-    second->m_parent = result;
-    result->fullReduce ();
-    return result;
+SnailfishPair* addAndReduce (SnailfishPair* first, SnailfishPair* second, bool clone) {
+    if (clone) {
+        SnailfishPair* firstClone = first->clone (NULL);
+        SnailfishPair* secondClone = second->clone (NULL);
+        SnailfishPair* result = new SnailfishPair (NULL, firstClone, secondClone);
+        firstClone->m_parent = result;
+        secondClone->m_parent = result;
+        result->fullReduce ();
+        return result;
+    }
+    else {
+        SnailfishPair* result = new SnailfishPair (NULL, first, second);
+        first->m_parent = result;
+        second->m_parent = result;
+        result->fullReduce ();
+        return result;
+    }
 }
 
 SnailfishPair* sumNumbers (std::vector<SnailfishPair*> & numbers) {
-    SnailfishPair* sum = numbers.front ();
+    SnailfishPair* sum = numbers.front ()->clone (NULL);
     for (unsigned int index {1U}; index < numbers.size (); ++index) {
-        sum = addAndReduce (sum, numbers.at (index));
+        sum = addAndReduce (sum, numbers.at (index)->clone (NULL), false);
     }
     return sum;
+}
+
+unsigned long findLargestSum (std::vector<SnailfishPair*> const& numbers) {
+    unsigned long largest = 0UL;
+    for (unsigned int a {0U}; a < numbers.size (); ++a) {
+        for (unsigned int b {0U}; b < numbers.size (); ++b) {
+            if (a != b) {
+                SnailfishPair* sum = addAndReduce (numbers.at (a), numbers.at (b), true);
+                unsigned long magnitude = sum->magnitude ();
+                if (magnitude > largest) { largest = magnitude; }
+                delete sum;
+            }
+        }
+    }
+    return largest;
 }
 
 bool singleReduceTest (std::string input, std::string expected) {
@@ -249,6 +290,7 @@ bool singleReduceTest (std::string input, std::string expected) {
     SnailfishPair* number = parse (chars, NULL);
     number->singleReduce ();
     std::string result = number->toString ();
+    delete number;
     if (result == expected) {
         return true;
     }
@@ -282,7 +324,7 @@ bool additionTest (std::string firstString, std::string secondString, std::strin
     SnailfishPair* firstNumber = parse (firstChars, NULL);
     std::deque<char> secondChars (secondString.begin (), secondString.end ());
     SnailfishPair* secondNumber = parse (secondChars, NULL);
-    SnailfishPair* sum = addAndReduce (firstNumber, secondNumber);
+    SnailfishPair* sum = addAndReduce (firstNumber, secondNumber, false);
     std::string result = sum->toString ();
     delete sum;
     if (result == expected) {
@@ -346,12 +388,16 @@ void runTests () {
 /// \brief Runs the prorgram.
 /// \return Always 0.
 int main () {
+    //runTests ();
+    
     std::vector<SnailfishPair*> numbers = getInput ();
     SnailfishPair* sum = sumNumbers (numbers);
-    numbers.clear ();
-    std::cout << *sum << "\n";
     std::cout << sum->magnitude () << "\n";
     delete sum;
-    runTests ();
+
+    std::cout << findLargestSum (numbers) << "\n";
+
+    for (SnailfishPair* number : numbers) { delete number; }    
+
     return 0;
 }
