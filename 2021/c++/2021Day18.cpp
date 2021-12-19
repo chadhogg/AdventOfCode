@@ -9,37 +9,77 @@
 
 #include "utilities.hpp"
 
+/// If a pair is nested inside this many other pairs, it explodes.
 constexpr unsigned int EXPLODE_DEPTH = 4U;
+/// If a literal gets this large, it splits.
 constexpr unsigned int SPLIT_LEVEL = 10U;
 
+// Forward declarations.
 class Snailfish;
 class SnailfishLiteral;
 class SnailfishPair;
 
+/// Some type of snailfish number.
 class Snailfish {
 public:
+    /// \brief Constructs a snailfish number.
+    /// \param[in] parent A pointer to the parent of this number, or NULL.
     Snailfish (SnailfishPair* parent) : m_parent (parent) {}
+
+    /// \brief Destructs a snailfish number.
     virtual ~Snailfish () {}
+
     Snailfish (Snailfish const& other) = delete;
     Snailfish& operator= (Snailfish const& other) = delete;
     Snailfish (Snailfish const&& other) = delete;
     Snailfish& operator= (Snailfish const&& other) = delete;
+
+    /// \brief Generates a string containing a representation of this snailfish number.
+    /// \return That string.
     virtual std::string toString () const = 0;
+
+    /// \brief Counts how many pairs this node is nested inside of.
+    /// \return The number of ancestors it has in the tree.
     unsigned int depth () const;
+
+    /// \brief Finds the next literal value to the left of this part of the tree.
+    /// \return That literal value.
     virtual SnailfishLiteral* findNextNumberToLeft () = 0;
+
+    /// \brief Finds the next literal value to the right of this part of the tree.
+    /// \return That literal value.
     virtual SnailfishLiteral* findNextNumberToRight () = 0;
+
+    /// \brief Descends the tree leftward until reaching a leaf.
+    /// \return That leaf.
     virtual SnailfishLiteral* descendLeft () = 0;
+
+    /// \brief Descends the tree rightward until reaching a leaf.
+    /// \return That leaf.
     virtual SnailfishLiteral* descendRight () = 0;
+
+    /// Computes the magnitude of this number.
+    /// Recursivesly, 3 * left child + 2 * right child.
     virtual unsigned long magnitude () const = 0;
 public:
+
+    /// A (weak) pointer to the parent of this tree node.  Needed for exploding.
     SnailfishPair* m_parent;
 };
 
+/// \brief Inserts a snailfish number into an output stream.
+/// \param[inout] out The stream.
+/// \param[in] snail The snailfish number.
+/// \return The stream.
+/// \post A representation of the snailfish number was inserted into the stream.
 std::ostream& operator<< (std::ostream& out, Snailfish const& snail) {
     out << snail.toString ();
     return out;
 }
 
+
+
+/// A leaf node in s snailfish number tree.
 class SnailfishLiteral : public Snailfish {
 public:
     SnailfishLiteral (SnailfishPair* parent, unsigned int value) : Snailfish (parent), m_value (value) {}
@@ -55,9 +95,13 @@ public:
     virtual SnailfishLiteral* descendRight () { return this; }
     virtual unsigned long magnitude () const { return m_value; }
 public:
+    /// The literal value stored in this leaf.
     unsigned int m_value;
 };
 
+
+
+/// An internal node in a snailfish number tree.
 class SnailfishPair : public Snailfish {
 public:
     SnailfishPair (SnailfishPair* parent, Snailfish* first, Snailfish* second) : Snailfish (parent), m_left (first), m_right (second) {}
@@ -66,19 +110,8 @@ public:
     SnailfishPair& operator= (SnailfishPair const& other) = delete;
     SnailfishPair (SnailfishPair const&& other) = delete;
     SnailfishPair& operator= (SnailfishPair const&& other) = delete;
+
     virtual std::string toString () const { return "[" + m_left->toString () + "," + m_right->toString () + "]"; }
-    void fullReduce () {
-        while (singleReduce ()) {
-            /* intentionally empty */
-        }
-    }
-    bool singleReduce () {
-        bool change = explodeFirstEligible ();
-        if (!change) {
-            change = splitFirstEligible ();
-        }
-        return change;
-    }
     virtual SnailfishLiteral* findNextNumberToLeft () {
         if (m_parent == NULL) {
             return NULL;
@@ -103,17 +136,47 @@ public:
     }
     virtual SnailfishLiteral* descendLeft () { return m_left->descendLeft (); }
     virtual SnailfishLiteral* descendRight () { return m_right->descendRight (); }
-    void explode () {
-        assert (depth () == EXPLODE_DEPTH);
-        SnailfishLiteral* numToLeft = findNextNumberToLeft ();
-        if (numToLeft != NULL) {
-            numToLeft->m_value += ((SnailfishLiteral*)m_left)->m_value;
+    virtual unsigned long magnitude () const { return 3 * m_left->magnitude () + 2 * m_right->magnitude (); }
+    SnailfishPair* clone (SnailfishPair* newParent) const {
+        SnailfishPair* copy = new SnailfishPair (newParent, NULL, NULL);
+        if (dynamic_cast<SnailfishPair*> (m_left)) {
+            copy->m_left = dynamic_cast<SnailfishPair*> (m_left)->clone (copy);
         }
-        SnailfishLiteral* numToRight = findNextNumberToRight ();
-        if (numToRight != NULL) {
-            numToRight->m_value += ((SnailfishLiteral*)m_right)->m_value;
+        else {
+            copy->m_left = new SnailfishLiteral (copy, dynamic_cast<SnailfishLiteral*> (m_left)->m_value);
+        }
+        if (dynamic_cast<SnailfishPair*> (m_right)) {
+            copy->m_right = dynamic_cast<SnailfishPair*> (m_right)->clone (copy);
+        }
+        else {
+            copy->m_right = new SnailfishLiteral (copy, dynamic_cast<SnailfishLiteral*> (m_right)->m_value);
+        }
+        return copy;
+    }
+
+    /// \brief Reduces this tree as much as possible.
+    /// \post This tree has been reduced until there are no more eligible explodes or splits.
+    /// \note This should only be called on the root node.
+    void fullReduce () {
+        while (singleReduce ()) {
+            /* intentionally empty */
         }
     }
+
+    /// \brief Performs the first available explode, or if none the first available split.
+    /// \post If an explode was available, the first one was done.  Otherwise, if a split was available, the first one was done.
+    /// \return Whether or not some reduction operation was applied.
+    bool singleReduce () {
+        bool change = explodeFirstEligible ();
+        if (!change) {
+            change = splitFirstEligible ();
+        }
+        return change;
+    }
+
+    /// \brief Finds and performs the first explodable node in an in-order traversal.
+    /// \post If any node in this subtree was explodable, the first such one has occurred.
+    /// \return Whether or not an explodable node was found.
     bool explodeFirstEligible () {
         if (dynamic_cast<SnailfishPair*> (m_left)) {
             if (m_left->depth () == EXPLODE_DEPTH) {
@@ -143,6 +206,10 @@ public:
         }
         return false;
     }
+
+    /// \brief Finds and performs the first splittable node in an in-order traversal.
+    /// \post If any node in this subtree was splittable, the first such one has occurred.
+    /// \return Whether or not a splittable node was found.
     bool splitFirstEligible () {
         if (dynamic_cast<SnailfishLiteral*> (m_left)) {
             unsigned int value = dynamic_cast<SnailfishLiteral*> (m_left)->m_value;
@@ -178,33 +245,41 @@ public:
         }
         return false;
     }
-    virtual unsigned long magnitude () const { return 3 * m_left->magnitude () + 2 * m_right->magnitude (); }
-    SnailfishPair* clone (SnailfishPair* newParent) const {
-        SnailfishPair* copy = new SnailfishPair (newParent, NULL, NULL);
-        if (dynamic_cast<SnailfishPair*> (m_left)) {
-            copy->m_left = dynamic_cast<SnailfishPair*> (m_left)->clone (copy);
+
+    /// \brief Explodes this node.
+    /// \post The left child has been added to the next literal to the left, and the right child to the next literal to the right.
+    void explode () {
+        assert (depth () == EXPLODE_DEPTH);
+        SnailfishLiteral* numToLeft = findNextNumberToLeft ();
+        if (numToLeft != NULL) {
+            numToLeft->m_value += ((SnailfishLiteral*)m_left)->m_value;
         }
-        else {
-            copy->m_left = new SnailfishLiteral (copy, dynamic_cast<SnailfishLiteral*> (m_left)->m_value);
+        SnailfishLiteral* numToRight = findNextNumberToRight ();
+        if (numToRight != NULL) {
+            numToRight->m_value += ((SnailfishLiteral*)m_right)->m_value;
         }
-        if (dynamic_cast<SnailfishPair*> (m_right)) {
-            copy->m_right = dynamic_cast<SnailfishPair*> (m_right)->clone (copy);
-        }
-        else {
-            copy->m_right = new SnailfishLiteral (copy, dynamic_cast<SnailfishLiteral*> (m_right)->m_value);
-        }
-        return copy;
     }
+
 public:
+    /// The left compoennt of this pair.
     Snailfish* m_left;
+    /// The right component of this pair.
     Snailfish* m_right;
 };
 
+// Documented above.
 unsigned int Snailfish::depth () const {
         if (m_parent == NULL) { return 0; }
         else { return 1U + m_parent->depth (); }
 }
 
+
+
+/// \brief Recursively parses (the next part of a) character stream into a snailfish number.
+/// \param[inout] line A source of characters.
+/// \param[in] parent The part node of the node that will be created.
+/// \post The relevant characters have been removed from the line.
+/// \note The number will have been dynamically allocated and will need to be deleted.
 SnailfishPair* parse (std::deque<char> & line, SnailfishPair* parent) {
     char next = line.front ();
     line.pop_front ();
@@ -233,6 +308,10 @@ SnailfishPair* parse (std::deque<char> & line, SnailfishPair* parent) {
     return pair;
 }
 
+
+/// \brief Reads the input to the problem.
+/// \return A vector of pointers to snailfish numbers.
+/// \note The elements of the vector were dynamically allocated and will need to be deleted at some point.
 std::vector<SnailfishPair*> getInput () {
     std::vector<SnailfishPair*> numbers;
     std::string line;
@@ -243,6 +322,13 @@ std::vector<SnailfishPair*> getInput () {
     return numbers;
 }
 
+
+/// \brief Adds two snailfish numbers and returns the fully reduced sum.
+/// \param[in] first The first addend.
+/// \param[in] second The second addend.
+/// \param[in] clone True to work with copies of the addends, false to use them directly.
+/// \return The reduced sum.
+/// \note The sum will need to be deleted.  If there was no cloning, it has taken over responsibility for deleting the addends.
 SnailfishPair* addAndReduce (SnailfishPair* first, SnailfishPair* second, bool clone) {
     if (clone) {
         SnailfishPair* firstClone = first->clone (NULL);
@@ -262,6 +348,10 @@ SnailfishPair* addAndReduce (SnailfishPair* first, SnailfishPair* second, bool c
     }
 }
 
+/// \brief Adds all the snailfish numbers in a vector.
+/// \param[in] numbers A vector containing all of the addends.
+/// \return The sum.
+/// \note The sum will need to be deleted.
 SnailfishPair* sumNumbers (std::vector<SnailfishPair*> & numbers) {
     SnailfishPair* sum = numbers.front ()->clone (NULL);
     for (unsigned int index {1U}; index < numbers.size (); ++index) {
@@ -270,6 +360,9 @@ SnailfishPair* sumNumbers (std::vector<SnailfishPair*> & numbers) {
     return sum;
 }
 
+/// \brief Adds all pairs of snailfish numbers in a vector, returning the magnitude of the largest sum.
+/// \param[in] numbers A fector containing all of the potential addends.
+/// \return The highest magnitude found in any pairwise sum.
 unsigned long findLargestSum (std::vector<SnailfishPair*> const& numbers) {
     unsigned long largest = 0UL;
     for (unsigned int a {0U}; a < numbers.size (); ++a) {
