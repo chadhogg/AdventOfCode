@@ -22,12 +22,14 @@
 
 
 
-
+/// A 3-dimensional vector in which all compoennts are integers.  Notably can be used to model a point in 3-D space.
 struct Vec3 {
-    long m_x;
-    long m_y;
-    long m_z;
+    /// The three components of the vector.
+    long m_x, m_y, m_z;
 
+    /// \brief Calculates the Euclidean distance between this point and another point.
+    /// \param[in] other The other point.
+    /// \return The Euclidean distance between myself and it.
     double distance (Vec3 const& other) const {
         long xDiff = m_x - other.m_x;
         long yDiff = m_y - other.m_y;
@@ -36,112 +38,159 @@ struct Vec3 {
     }
 };
 
-namespace matrix {
-    inline bool approxEqual (double x, double y) {
+
+
+/// A system of linear equations, modeled as an augmented matrix.
+struct SystemOfEquations {
+    using Row = std::vector<double>;
+    using Matrix = std::vector<Row>;
+
+    /// \brief Adds an equation to the system.
+    /// \param[in] row A vector of coefficient values.
+    /// \post This equation has been added to the system.
+    void addEquation (Row const& row) {
+        m_matrix.push_back (row);
+    }
+
+    /// \brief Attempts to solve the system of equations using Gauss-Jordan Elimination.
+    /// \post The equations are solved such that each has the value of one variable.
+    /// \return The values of each of the variables.
+    std::vector<double> solve () {
+        moveZeroesToBottom ();
+        triangularForm ();
+        if (hasAllZeroesRow ()) {
+            throw std::runtime_error ("There are an infinite number of solutions to the system of equations.");
+        }
+        else if(hasAlmostAllZeroesRow ()) {
+            throw std::runtime_error ("There is no solution to the system of equations.");
+        }
+        reduce ();
+        backSubstitute ();
+        std::vector<double> results;
+        for (Row const& row : m_matrix) {
+            results.push_back (row.back ());
+        }
+        return results;
+    }
+
+
+private:
+
+    inline static bool approxEqual (double x, double y) {
         return std::abs (x - y) < 0.00001;
     }
 
-    using Matrix = std::vector<std::vector<double>>;
-
-    void swapRows (Matrix & matrix, unsigned int rowIndexA, unsigned int rowIndexB) {
-        std::vector<double> temp = matrix[rowIndexA];
-        matrix[rowIndexA] = matrix[rowIndexB];
-        matrix[rowIndexB] = temp;
+    void swapRows (unsigned int rowIndexA, unsigned int rowIndexB) {
+        Row temp = m_matrix[rowIndexA];
+        m_matrix[rowIndexA] = m_matrix[rowIndexB];
+        m_matrix[rowIndexB] = temp;
     }
 
-    unsigned int countLeadingZeroes (Matrix const& matrix, unsigned int rowIndex) {
-        for (unsigned int index {0U}; index < matrix.at (rowIndex).size (); ++index) {
-            if (!approxEqual (matrix.at (rowIndex).at (index), 0.0f)) {
+    unsigned int countLeadingZeroes (unsigned int rowIndex) const {
+        for (unsigned int index {0U}; index < m_matrix.at (rowIndex).size (); ++index) {
+            if (!approxEqual (m_matrix.at (rowIndex).at (index), 0.0f)) {
                 return index;
             }
         }
-        return matrix.at (rowIndex).size ();
+        return m_matrix.at (rowIndex).size ();
     }
-        unsigned int count {0U};
 
-    void moveZeroesToBottom (Matrix & matrix) {
-        for (int targetRow {(int)matrix.size () - 1}; targetRow > 0; --targetRow) {
+    void moveZeroesToBottom () {
+        for (int targetRow {(int)m_matrix.size () - 1}; targetRow > 0; --targetRow) {
             unsigned int indexWithMostLeadingZeroes = targetRow;
             for (int otherRow {targetRow - 1}; otherRow >= 0; --otherRow) {
-                if (countLeadingZeroes (matrix, otherRow) > countLeadingZeroes (matrix, indexWithMostLeadingZeroes)) {
+                if (countLeadingZeroes (otherRow) > countLeadingZeroes (indexWithMostLeadingZeroes)) {
                     indexWithMostLeadingZeroes = otherRow;
                 }
             }
-            swapRows (matrix, targetRow, indexWithMostLeadingZeroes);
+            swapRows (targetRow, indexWithMostLeadingZeroes);
         }
     }
 
-    void triangularForm (Matrix & matrix) {
-        for (unsigned int killerRow {0U}; killerRow < matrix.size (); ++killerRow) {
-            for (unsigned int killedRow {killerRow + 1U}; killedRow < matrix.size (); ++killedRow) {
-                double factor = matrix.at (killedRow).at (killerRow) / matrix.at (killerRow).at (killerRow);
-                for (unsigned int col {0U}; col < matrix.at (0).size (); ++col) {
-                    matrix[killedRow][col] = matrix[killedRow][col] - factor * matrix[killerRow][col];
+    void triangularForm () {
+        for (unsigned int killerRow {0U}; killerRow < m_matrix.size (); ++killerRow) {
+            for (unsigned int killedRow {killerRow + 1U}; killedRow < m_matrix.size (); ++killedRow) {
+                double factor = m_matrix.at (killedRow).at (killerRow) / m_matrix.at (killerRow).at (killerRow);
+                for (unsigned int col {0U}; col < m_matrix.at (0).size (); ++col) {
+                    m_matrix[killedRow][col] = m_matrix[killedRow][col] - factor * m_matrix[killerRow][col];
                 }
             }
-            moveZeroesToBottom (matrix);
+            moveZeroesToBottom ();
         }
     }
 
-    bool hasAllZeroesRow (Matrix const& matrix) {
-        for (unsigned int row {0U}; row < matrix.size (); ++row) {
-            if (countLeadingZeroes (matrix, row) == matrix.at (row).size ()) {
+    bool hasAllZeroesRow () const {
+        for (unsigned int row {0U}; row < m_matrix.size (); ++row) {
+            if (countLeadingZeroes (row) == m_matrix.at (row).size ()) {
                 return true;
             }
         }
         return false;
     }
 
-    bool hasAlmostAllZeroesRow (Matrix const& matrix) {
-        for (unsigned int row {0U}; row < matrix.size (); ++row) {
-            if (countLeadingZeroes (matrix, row) == matrix.at (row).size () - 1) {
+    bool hasAlmostAllZeroesRow () const {
+        for (unsigned int row {0U}; row < m_matrix.size (); ++row) {
+            if (countLeadingZeroes (row) == m_matrix.at (row).size () - 1) {
                 return true;
             }
         }
         return false;
     }
 
-    void reduce (Matrix & matrix) {
-        for (unsigned int row {0U}; row < matrix.size (); ++row) {
-            double factor = matrix.at (row).at (row);
-            for (unsigned int col {0U}; col < matrix.at (row).size (); ++col) {
-                matrix[row][col] /= factor;
+    void reduce () {
+        for (unsigned int row {0U}; row < m_matrix.size (); ++row) {
+            double factor = m_matrix.at (row).at (row);
+            for (unsigned int col {0U}; col < m_matrix.at (row).size (); ++col) {
+                m_matrix[row][col] /= factor;
             }
         }
     }
 
-    void backSubstitute (Matrix & matrix) {
-        for (int rowUsed {(int)matrix.size () - 1}; rowUsed >= 0; --rowUsed) {
+    void backSubstitute () {
+        for (int rowUsed {(int)m_matrix.size () - 1}; rowUsed >= 0; --rowUsed) {
             for (int rowModified {rowUsed - 1}; rowModified >= 0; --rowModified) {
-                double factor = matrix.at (rowModified).at (rowUsed);
-                for (unsigned int col {0U}; col < matrix.at (0).size (); ++col) {
-                    matrix[rowModified][col] -= factor * matrix[rowUsed][col];
+                double factor = m_matrix.at (rowModified).at (rowUsed);
+                for (unsigned int col {0U}; col < m_matrix.at (0).size (); ++col) {
+                    m_matrix[rowModified][col] -= factor * m_matrix[rowUsed][col];
                 }
             }
         }
     }
 
-    void eliminate (Matrix & matrix) {
-        moveZeroesToBottom (matrix);
-        triangularForm (matrix);
-        if (hasAllZeroesRow (matrix)) {
-            throw std::runtime_error ("There are an infinite number of solutions to the system of equations.");
-        }
-        else if(hasAlmostAllZeroesRow (matrix)) {
-            throw std::runtime_error ("There is no solution to the system of equations.");
-        }
-        reduce (matrix);
-        backSubstitute (matrix);
-    }
+    Matrix m_matrix;
 };
 
-Vec3 multiply (matrix::Matrix const& transform, Vec3 const& input) {
-    Vec3 result;
-    result.m_x = lrint (transform.at (0).at (0) * input.m_x + transform.at (0).at (1) * input.m_y + transform.at (0).at (2) * input.m_z + transform.at (0).at (3));
-    result.m_y = lrint (transform.at (1).at (0) * input.m_x + transform.at (1).at (1) * input.m_y + transform.at (1).at (2) * input.m_z + transform.at (1).at (3));
-    result.m_z = lrint (transform.at (2).at (0) * input.m_x + transform.at (2).at (1) * input.m_z + transform.at (2).at (2) * input.m_z + transform.at (2).at (3));
-    return result;
-}
+
+
+/// A representation of an affine transformation in 3D space.
+class TransformationMatrix {
+public:
+
+    /// \brief Constructs a transformation matrix.
+    /// \param[in] coefficients The values to be stored in the matrix, in row order.
+    TransformationMatrix (std::vector<double> const& coefficients) {
+        assert (coefficients.size () == 12);
+        for (unsigned int row {0U}; row < m_matrix.size (); ++row) {
+            for (unsigned int col {0U}; col < m_matrix[row].size (); ++col) {
+                m_matrix[row][col] = coefficients.at (row * m_matrix[row].size () + col);
+            }
+        }
+    }
+
+    /// \brief Transforms a vector.
+    /// \param[in] input The input vector.  It is presumed to have a fourth component of 1.
+    /// \return The vector after being multiplied on the left by this matrix.
+    Vec3 multiply (Vec3 const& input) const {
+        Vec3 result;
+        result.m_x = lrint (m_matrix[0][0] * input.m_x + m_matrix[0][1] * input.m_y + m_matrix[0][2] * input.m_z + m_matrix[0][3]);
+        result.m_y = lrint (m_matrix[1][0] * input.m_x + m_matrix[1][1] * input.m_y + m_matrix[1][2] * input.m_z + m_matrix[1][3]);
+        result.m_z = lrint (m_matrix[2][0] * input.m_x + m_matrix[2][1] * input.m_z + m_matrix[2][2] * input.m_z + m_matrix[2][3]);
+        return result;
+    }
+
+private:
+    std::array<std::array<double, 4>, 3> m_matrix;
+};
 
 
 using Beacon = Vec3;
@@ -271,9 +320,10 @@ std::unordered_map<Index, Index> mapBeacons (Scanner const& done, Scanner const&
     return doneToOther;
 }
 
-matrix::Matrix findTransformationMatrix (Scanner const& done, Scanner const& other, std::unordered_map<Index, Index> const& doneToOther) {
-    matrix::Matrix matrix;
-    for (unsigned int doneIndex {0U}; matrix.size () < 12; ++doneIndex) {
+TransformationMatrix findTransformationMatrix (Scanner const& done, Scanner const& other, std::unordered_map<Index, Index> const& doneToOther) {
+    SystemOfEquations system;
+    unsigned int numAdded {0U};
+    for (unsigned int doneIndex {0U}; numAdded < 12; ++doneIndex) {
         if (doneToOther.find (doneIndex) != doneToOther.end ()) {
             Beacon const& doneBeacon = done.m_beacons.at (doneIndex);
             Beacon const& otherBeacon = other.m_beacons.at (doneToOther.at (doneIndex));
@@ -295,25 +345,14 @@ matrix::Matrix findTransformationMatrix (Scanner const& done, Scanner const& oth
             bottomRow[10] = otherBeacon.m_z;
             bottomRow[11] = 1.0;
             bottomRow[12] = doneBeacon.m_z;
-            matrix.push_back (topRow);
-            matrix.push_back (middleRow);
-            matrix.push_back (bottomRow);
+            system.addEquation (topRow);
+            system.addEquation (middleRow);
+            system.addEquation (bottomRow);
+            numAdded += 3;
         }
     }
-    matrix::eliminate (matrix);
-
-    matrix::Matrix transform;
-    transform.push_back ({matrix[0][12], matrix[1][12], matrix[2][12], matrix[3][12]});
-    transform.push_back ({matrix[4][12], matrix[5][12], matrix[6][12], matrix[7][12]});
-    transform.push_back ({matrix[8][12], matrix[9][12], matrix[10][12], matrix[11][12]});
-    transform.push_back ({0.0, 0.0, 0.0, 1.0});
-
-    //for (std::pair<Index, Index> mapping : doneToOther) {
-        //std::cout << "\nDone:        " << done.m_beacons.at (mapping.first) << "\n";
-        //std::cout << "Transformed: " << multiply (transform, other.m_beacons.at (mapping.second)) << "\n";
-        //assert (done.m_beacons.at (mapping.first) == multiply (transform, other.m_beacons.at (mapping.second)));
-    //}
-    return transform;
+    std::vector<double> coefficients = system.solve ();
+    return TransformationMatrix (coefficients);
 }
 
 void searchForOverlappingScanners (SomeScanners & finished, SomeScanners & outstanding) {
@@ -323,13 +362,13 @@ void searchForOverlappingScanners (SomeScanners & finished, SomeScanners & outst
             std::unordered_map<Index, Index> doneToOther = mapBeacons (done.second, other.second, matches);
             if (doneToOther.size () >= 12) {
                 std::cout << "It appears that scanner " << other.first << " shares visibility with scanner " << done.first << "\n";
-                matrix::Matrix transform = findTransformationMatrix (done.second, other.second, doneToOther);
-                std::cout << transform << "\n";
+                TransformationMatrix transform = findTransformationMatrix (done.second, other.second, doneToOther);
+                //std::cout << transform << "\n";
                 Scanner revised {other.second};
                 for (unsigned int beaconIndex {0U}; beaconIndex < revised.m_beacons.size (); ++beaconIndex) {
-                    revised.m_beacons[beaconIndex] = multiply (transform, revised.m_beacons.at (beaconIndex));
+                    revised.m_beacons[beaconIndex] = transform.multiply (revised.m_beacons.at (beaconIndex));
                 }
-                revised.m_location = multiply (transform, revised.m_location);
+                revised.m_location = transform.multiply (revised.m_location);
                 outstanding.erase (revised.m_id);
                 finished.insert ({revised.m_id, revised});
                 break;
