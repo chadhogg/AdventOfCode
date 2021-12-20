@@ -28,20 +28,20 @@ class Vector3
   /// \brief Initializes a new vector to have all coefficients identical.
   /// \param[in] xyz The value that should be used for all three coefficients.
   /// \post All coefficients are equal to xyz.
-  Vector3 (float xyz);
+  Vector3 (double xyz);
 
   /// \brief Initializes a new vector with custom coefficients.
   /// \param[in] x The coefficient for the basis vector i.
   /// \param[in] y The coefficient for the basis vector j.
   /// \param[in] z The coefficient for the basis vector k.
   /// \post The coefficients are equal to x, y, and z respectively.
-  Vector3 (float x, float y, float z);
+  Vector3 (double x, double y, double z);
 
   /// \brief Sets each coefficient to the same value.
   /// \param[in] xyz The value that should be used for all three coefficients.
   /// \post All coefficients are equal to xyz.
   void
-  set (float xyz);
+  set (double xyz);
 
   /// \brief Sets each coefficient to (potentially) different values.
   /// \param[in] x The new coefficient for the basis vector i.
@@ -49,7 +49,7 @@ class Vector3
   /// \param[in] z The new coefficient for the basis vector k.
   /// \post The coefficients are equal to x, y, and z respectively.
   void
-  set (float x, float y, float z);
+  set (double x, double y, double z);
 
   /// \brief Replaces the direction of this vector to its exact opposite.
   /// \post The vector has been negated.
@@ -59,13 +59,13 @@ class Vector3
   /// \brief Compute the dot product of this with another vector.
   /// \param[in] v The other vector.
   /// \return The dot product of this and v.
-  float
+  double
   dot (const Vector3& v) const;
 
   /// \brief Computes the angle (in radians) between this and another vector.
   /// \param[in] v The other vector.
   /// \return The angle between this and v, expressed in radians.
-  float
+  double
   angleBetween (const Vector3& v) const;
 
   /// \brief Computes the cross product between this and another vector.
@@ -76,7 +76,7 @@ class Vector3
 
   /// \brief Computes the length of this vector.
   /// \return The length of this vector.
-  float
+  double
   length () const;
 
   /// \brief Normalizes this vector.
@@ -103,21 +103,21 @@ class Vector3
   /// \post This vector has been replaced with itself times s.
   /// \return This vector.
   Vector3&
-  operator*= (float s);
+  operator*= (double s);
 
   /// \brief Divies this vector by a scalar.
   /// \param[in] s A scalar.
   /// \post This vector has been replaced with itself divided by s.
   /// \return This vector.
   Vector3&
-  operator/= (float s);
+  operator/= (double s);
 
   /// \brief The coefficient of the basis vector i.
-  float m_x;
+  double m_x;
   /// \brief The coefficient of the basis vector j.
-  float m_y;
+  double m_y;
   /// \brief The coefficient of the basis vector k.
-  float m_z;
+  double m_z;
 };
 
 /// \brief Adds two vectors.
@@ -145,21 +145,21 @@ operator- (const Vector3& v);
 /// \param[in] v A vector.
 /// \return A new vector that is s * v.
 Vector3
-operator* (float s, const Vector3& v);
+operator* (double s, const Vector3& v);
 
 /// \brief Multiplies a vector by a scalar.
 /// \param[in] v A vector.
 /// \param[in] s A scalar.
 /// \return A new vector that is v * s.
 Vector3
-operator* (const Vector3& v, float s);
+operator* (const Vector3& v, double s);
 
 /// \brief Divides a vector by a scalar.
 /// \param[in] v A vector.
 /// \param[in] s A scalar.
 /// \return A new vector that is v / s.
 Vector3
-operator/ (const Vector3& v, float s);
+operator/ (const Vector3& v, double s);
 
 /// \brief Inserts a vector into an output stream.
 /// Each component of the vector should have 2 digits of precision and a field

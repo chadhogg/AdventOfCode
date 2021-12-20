@@ -15,24 +15,24 @@ Vector3::Vector3 ()
   set (0.0f);
 }
 
-Vector3::Vector3 (float xyz)
+Vector3::Vector3 (double xyz)
 {
   set (xyz);
 }
 
-Vector3::Vector3 (float x, float y, float z)
+Vector3::Vector3 (double x, double y, double z)
 {
   set (x, y, z);
 }
 
 void
-Vector3::set (float xyz)
+Vector3::set (double xyz)
 {
   set (xyz, xyz, xyz);
 }
 
 void
-Vector3::set (float x, float y, float z)
+Vector3::set (double x, double y, double z)
 {
   m_x = x;
   m_y = y;
@@ -47,13 +47,13 @@ Vector3::negate ()
   m_z = -m_z;
 }
 
-float
+double
 Vector3::dot (const Vector3& v) const
 {
   return m_x * v.m_x + m_y * v.m_y + m_z * v.m_z;
 }
 
-float
+double
 Vector3::angleBetween (const Vector3& v) const
 {
   return acos (dot (v) / (length () * v.length ()));
@@ -67,7 +67,7 @@ Vector3::cross (const Vector3& v) const
 		  m_x * v.m_y - m_y * v.m_x);
 }
 
-float
+double
 Vector3::length () const
 {
   return sqrt (m_x * m_x + m_y * m_y + m_z * m_z);
@@ -98,7 +98,7 @@ Vector3::operator-= (const Vector3& v)
 }
 
 Vector3&
-Vector3::operator*= (float s)
+Vector3::operator*= (double s)
 {
   m_x *= s;
   m_y *= s;
@@ -107,7 +107,7 @@ Vector3::operator*= (float s)
 }
 
 Vector3&
-Vector3::operator/= (float s)
+Vector3::operator/= (double s)
 {
   m_x /= s;
   m_y /= s;
@@ -141,7 +141,7 @@ operator- (const Vector3& v)
 }
 
 Vector3
-operator* (float s, const Vector3& v)
+operator* (double s, const Vector3& v)
 {
   Vector3 r(v);
   r *= s;
@@ -149,13 +149,13 @@ operator* (float s, const Vector3& v)
 }
 
 Vector3
-operator* (const Vector3& v, float s)
+operator* (const Vector3& v, double s)
 {
   return s * v;
 }
 
 Vector3
-operator/ (const Vector3& v, float s)
+operator/ (const Vector3& v, double s)
 {
   Vector3 r(v);
   r /= s;
@@ -175,7 +175,7 @@ operator<< (std::ostream& out, const Vector3& v)
 bool
 operator== (const Vector3& v1, const Vector3& v2)
 {
-  const float EPSILON = 0.00001f;
+  const double EPSILON = 0.1;
   return fabs (v1.m_x - v2.m_x) < EPSILON &&
 	 fabs (v1.m_y - v2.m_y) < EPSILON &&
 	 fabs (v1.m_z - v2.m_z) < EPSILON;
