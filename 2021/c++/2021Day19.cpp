@@ -204,7 +204,7 @@ public:
         Vec3 result;
         result.m_x = lrint (m_matrix[0][0] * input.m_x + m_matrix[0][1] * input.m_y + m_matrix[0][2] * input.m_z + m_matrix[0][3]);
         result.m_y = lrint (m_matrix[1][0] * input.m_x + m_matrix[1][1] * input.m_y + m_matrix[1][2] * input.m_z + m_matrix[1][3]);
-        result.m_z = lrint (m_matrix[2][0] * input.m_x + m_matrix[2][1] * input.m_z + m_matrix[2][2] * input.m_z + m_matrix[2][3]);
+        result.m_z = lrint (m_matrix[2][0] * input.m_x + m_matrix[2][1] * input.m_y + m_matrix[2][2] * input.m_z + m_matrix[2][3]);
         return result;
     }
 
@@ -398,6 +398,20 @@ void searchForOverlappingScanners (SomeScanners & finished, SomeScanners & outst
 }
 
 
+long furthestDistance (SomeScanners const& scanners) {
+    long furthest = 0L;
+    for (std::pair<ScanID, Scanner> const& scan1 : scanners) {
+        for (std::pair<ScanID, Scanner> const& scan2 : scanners) {
+            long distance = std::abs (scan1.second.m_location.m_x - scan2.second.m_location.m_x);
+            distance += std::abs (scan1.second.m_location.m_y - scan2.second.m_location.m_y);
+            distance += std::abs (scan1.second.m_location.m_z - scan2.second.m_location.m_z);
+            if (distance > furthest) { furthest = distance; }
+        }
+    }
+    return furthest;
+}
+
+
 
 /// \brief Runs the prorgram.
 /// \return Always 0.
@@ -418,8 +432,6 @@ int main () {
         }
     }
     std::cout << allBeacons.size () << "\n";
-    for (Vec3 const& vec : allBeacons) {
-        std::cout << vec << "\n";
-    }
+    std::cout << furthestDistance (finished) << "\n";
     return 0;
 }
