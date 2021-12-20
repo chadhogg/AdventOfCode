@@ -36,7 +36,27 @@ struct Vec3 {
         long zDiff = m_z - other.m_z;
         return sqrt (xDiff * xDiff + yDiff * yDiff + zDiff * zDiff);
     }
+
+    bool operator== (Vec3 const& other) const {
+        return m_x == other.m_x && m_y == other.m_y && m_z == other.m_z;
+    }
 };
+
+/// \brief An object that hashes Vec3s.
+template<>
+struct std::hash<Vec3> {
+    /// \brief Hashes a Vec3.
+    /// \param[in] thing A Vec3 that should be hashed.
+    /// \return That Vec3's hash value.
+    std::size_t operator()(Vec3 const& thing) const {
+        return thing.m_x + thing.m_y * 7 + thing.m_z * 13;
+    }
+};
+
+std::ostream& operator<< (std::ostream & out, Vec3 const& vec) {
+    out << vec.m_x << "," << vec.m_y << "," << vec.m_z;
+    return out;
+}
 
 
 
@@ -292,7 +312,7 @@ std::unordered_map<Index, Index> mapBeacons (Scanner const& done, Scanner const&
                         Index matchBDoneOther = (matchB.first.first == doneIndex ? matchB.first.second : matchB.first.first);
                         if (matchADoneOther != matchBDoneOther) {
                             if (matchA.second.first != matchB.second.first && matchA.second.first != matchB.second.second && matchA.second.second != matchB.second.first && matchA.second.second != matchB.second.second) {
-                                std::cout << "Weirdly, found a match between " << matchA.first << " and " << matchB.first << " but not " << matchA.second << " and " << matchB.second << "\n";
+                                //std::cout << "Weirdly, found a match between " << matchA.first << " and " << matchB.first << " but not " << matchA.second << " and " << matchB.second << "\n";
                                 break;
                             }
                             // We have found two different pairs the involve the index we are currently working on.
@@ -304,11 +324,11 @@ std::unordered_map<Index, Index> mapBeacons (Scanner const& done, Scanner const&
                                 otherToDone.insert ({otherIndex, doneIndex});
                             }
                             if (doneToOther.at (doneIndex) != otherIndex) {
-                                std::cout << "Hmm, beacon " << doneIndex << " seems to be mappable to both " << doneToOther.at (doneIndex) << " and to " << otherIndex << "\n";
+                                //std::cout << "Hmm, beacon " << doneIndex << " seems to be mappable to both " << doneToOther.at (doneIndex) << " and to " << otherIndex << "\n";
                                 doneToOther.erase (doneIndex);
                             }
                             if (otherToDone.at (otherIndex) != doneIndex) {
-                                std::cout << "Hmm, beacon " << otherIndex << " seems to be mappable from both " << otherToDone.at (otherIndex) << " and from " << doneIndex << "\n";
+                                //std::cout << "Hmm, beacon " << otherIndex << " seems to be mappable from both " << otherToDone.at (otherIndex) << " and from " << doneIndex << "\n";
                                 otherToDone.erase (otherIndex);
                             }
                         }
@@ -361,7 +381,7 @@ void searchForOverlappingScanners (SomeScanners & finished, SomeScanners & outst
             std::vector<std::pair<IndexPair, IndexPair>> matches = findSameDistanceBeacons (done.second, other.second);
             std::unordered_map<Index, Index> doneToOther = mapBeacons (done.second, other.second, matches);
             if (doneToOther.size () >= 12) {
-                std::cout << "It appears that scanner " << other.first << " shares visibility with scanner " << done.first << "\n";
+                //std::cout << "It appears that scanner " << other.first << " shares visibility with scanner " << done.first << "\n";
                 TransformationMatrix transform = findTransformationMatrix (done.second, other.second, doneToOther);
                 //std::cout << transform << "\n";
                 Scanner revised {other.second};
@@ -390,6 +410,16 @@ int main () {
     outstanding.erase (0U);
     while (!outstanding.empty ()) {
         searchForOverlappingScanners (finished, outstanding);
+    }
+    std::unordered_set<Beacon> allBeacons;
+    for (std::pair<ScanID, Scanner> const& scan : finished) {
+        for (Beacon const& beacon : scan.second.m_beacons) {
+            allBeacons.insert (beacon);
+        }
+    }
+    std::cout << allBeacons.size () << "\n";
+    for (Vec3 const& vec : allBeacons) {
+        std::cout << vec << "\n";
     }
     return 0;
 }
