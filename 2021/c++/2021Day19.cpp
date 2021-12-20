@@ -4,9 +4,20 @@
 
 // Key insight: If sensor A sees two beacons that are X distance from each other and sensor B sees two beacons that are X distance from each other,
 //   then those two beacons are likely to be the same beacons.
-// We will assume the input was generated such that if we find 12 such beacons, they definitely are the same.
+// We can determine which ones in the pair match each other by looking for other pairs that involve one but not the other.
+
 // Second key insight: If those beacons are the same, there is an affine transformation from sensor B's view of the world to sensor A's,
 //   and we can find that transformation matrix by solving a system of linear equations.
+// Specifically, any beacon gives us three of the equations, with [x,y,z] being the original location, [x',y',z'] being location from sensor 0's perspective.
+//   x'   a b c d   x   ax + by + cz + d
+//   y'   e f g h   y   ex + fy + gz + h
+//   z' = i j k l * z = ix + jy + kz + l
+//   1    0 0 0 1   1   0  + 0  + 0  + 1
+//
+//   xa + yb + zc + 1d + 0e + 0f + 0g + 0h + 0i + 0j + 0k + 0l = x'
+//   0a + 0b + 0c + 0d + xe + yf + zg + 1h + 0i + 0j + 0k + 0l = y'
+//   0a + 0b + 0c + 0d + 0e + 0f + 0g + 0h + xi + yj + zk + 1l = z'
+// After solving the system of linear equations to find a, b, ... l we can apply it to all beacons and the sensor itself to find true coordinates.
 
 
 #include <iostream>
@@ -37,6 +48,9 @@ struct Vec3 {
         return sqrt (xDiff * xDiff + yDiff * yDiff + zDiff * zDiff);
     }
 
+    /// \brief Tests whether or not two vectors are identical.
+    /// \param[in] other The other vector.
+    /// \return True if this vector and the other vector are the same.
     bool operator== (Vec3 const& other) const {
         return m_x == other.m_x && m_y == other.m_y && m_z == other.m_z;
     }
@@ -53,6 +67,10 @@ struct std::hash<Vec3> {
     }
 };
 
+/// \brief Inserts a vector into an output stream.
+/// \param[inout] out The stream.
+/// \param[in] vec The vector.
+/// \return The stream.
 std::ostream& operator<< (std::ostream & out, Vec3 const& vec) {
     out << vec.m_x << "," << vec.m_y << "," << vec.m_z;
     return out;
@@ -61,7 +79,8 @@ std::ostream& operator<< (std::ostream & out, Vec3 const& vec) {
 
 
 /// A system of linear equations, modeled as an augmented matrix.
-struct SystemOfEquations {
+class SystemOfEquations {
+public:
     using Row = std::vector<double>;
     using Matrix = std::vector<Row>;
 
@@ -219,16 +238,25 @@ using ScanID = unsigned int;
 using Distance = double;
 using IndexPair = std::pair<Index, Index>;
 
+
+/// The information about a scanner.
 struct Scanner {
-    unsigned int m_id;
+    /// It's number.
+    ScanID m_id;
+    /// A collection of the locations of its beacons.
     std::vector<Beacon> m_beacons;
+    /// A map from distances to pairs of beacons, for finding overlapping scanners.
     std::unordered_map<Distance, IndexPair> m_distances;
+    /// The location of the scanner, relative to scanner 0.
     Vec3 m_location;
 };
+
 
 using SomeScanners = std::unordered_map<ScanID, Scanner>;
 
 
+/// \brief Gets the input to the problem.
+/// \return A map from scanner numbers to the scanners themselves.
 SomeScanners getInput () {
     SomeScanners scanners;
     Scanner scanner;
@@ -272,6 +300,11 @@ SomeScanners getInput () {
 }
 
 
+/// \brief Finds the pairs of beacons in two scanners that have the same distance from each other.
+/// \param[in] done A scanner whose position and orientation are already fixed.
+/// \param[in] other Another scanner, whose position and orientation are not yet known.
+/// \return A vector of pairs in which the first element is a pair of beacon indexes in done and the seocnd is a pair of beacon indexes in other
+///   and the distance between the first pair equals the distance between the second pair. 
 std::vector<std::pair<IndexPair, IndexPair>> findSameDistanceBeacons (Scanner const& done, Scanner const& other) {
     std::vector<std::pair<IndexPair, IndexPair>> beaconPairPairs;
     for (std::pair<Distance, IndexPair> const& donePair : done.m_distances) {
@@ -283,6 +316,11 @@ std::vector<std::pair<IndexPair, IndexPair>> findSameDistanceBeacons (Scanner co
     return beaconPairPairs;
 }
 
+/// \brief Determines which beacon index in the other scanner matches a given index in the finished scanner.
+/// \param[in] doneIndex The beacon index within the finished scanner that we are trying to match.  It should be common to both pairs.
+/// \param[in] matchA One pair of same distance beacon pairs.
+/// \param[in] matchB Another pair of same distance beacon pairs.
+/// \return The index from the unfinished scanner that is common to both pairs. 
 Index findCommonIndex (Index doneIndex, std::pair<IndexPair, IndexPair> const& matchA, std::pair<IndexPair, IndexPair> const& matchB) {
     assert (matchA.first.first == doneIndex || matchA.first.second == doneIndex);
     assert (matchB.first.first == doneIndex || matchB.first.second == doneIndex);
@@ -294,6 +332,12 @@ Index findCommonIndex (Index doneIndex, std::pair<IndexPair, IndexPair> const& m
     else { throw std::runtime_error ("There was no number in common between " + to_string (otherMatchA) + " and " + to_string (otherMatchB)); }
 }
 
+/// \brief Find a plausible mapping from beacon indices in one scanner to beacon indices in another scanner.
+/// \param[in] done A scanner whose orientation and position are fixed.
+/// \param[in] other A scanner whose orientation and position are still unknown.
+/// \param[in] matchingPairs A list of pairs of beacon pairs that are the same distance from each other from both scanner's perspectives.
+/// \return A map from beacon indices in the done scanner to beacon indices in the other scanner.
+/// \note This is a fuzzy process where we could get false positives.  If something looks like it isnt' working out, we just silently discard it.
 std::unordered_map<Index, Index> mapBeacons (Scanner const& done, Scanner const& other, std::vector<std::pair<IndexPair, IndexPair>> const& matchingPairs) {
     std::unordered_map<Index, Index> doneToOther;
     std::unordered_map<Index, Index> otherToDone;
@@ -340,6 +384,12 @@ std::unordered_map<Index, Index> mapBeacons (Scanner const& done, Scanner const&
     return doneToOther;
 }
 
+
+/// \brief Finds the transformation matrix that transforms one scanner's position to another's.
+/// \param[in] done A scanner whose position and orientation are already known.
+/// \param[in] other A scanner whose position and orientation are not yet known.
+/// \param[in] doneToOther A mapping of beacon indices for the done scanner to beacon indices for the other scanner.
+/// \return A transformation matrix that transforms other scanner coordinates to done scanner coordinates.
 TransformationMatrix findTransformationMatrix (Scanner const& done, Scanner const& other, std::unordered_map<Index, Index> const& doneToOther) {
     SystemOfEquations system;
     unsigned int numAdded {0U};
@@ -375,6 +425,11 @@ TransformationMatrix findTransformationMatrix (Scanner const& done, Scanner cons
     return TransformationMatrix (coefficients);
 }
 
+
+/// \brief Finds one scanner whose position and orientation can be determined, and determines them.
+/// \param[inout] finished A collection of scanners whose position and orientation are already known.
+/// \param[inout] outstanding A collection of scanners whose position and orientation are not yet known.
+/// \post One scanner from outstanding has been removed and a transformed version of it added to finished.
 void searchForOverlappingScanners (SomeScanners & finished, SomeScanners & outstanding) {
     for (std::pair<ScanID, Scanner> done : finished) {
         for (std::pair<ScanID, Scanner> other : outstanding) {
@@ -398,6 +453,9 @@ void searchForOverlappingScanners (SomeScanners & finished, SomeScanners & outst
 }
 
 
+/// \brief Finds the largest Manhattan distance between two scanners.
+/// \param[in] scanners A collection of all of the scanners.
+/// \return The largest Manhattan distance between any two scanners.
 long furthestDistance (SomeScanners const& scanners) {
     long furthest = 0L;
     for (std::pair<ScanID, Scanner> const& scan1 : scanners) {
