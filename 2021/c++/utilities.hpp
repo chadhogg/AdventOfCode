@@ -126,6 +126,17 @@ struct std::hash<std::pair<A, B>> {
     }
 };
 
+/// \brief A function that makes pairs printable.
+template<typename A, typename B>
+std::ostream & operator<< (std::ostream & out, std::pair<A, B> const& pair) {
+    out << "<" << pair.first << ", " << pair.second << ">";
+    return out;
+}
+
+template<typename A, typename B>
+std::string to_string (std::pair<A, B> const& pair) {
+    return "<" + std::to_string (pair.first) + ", " + std::to_string (pair.second) + ">";
+}
 
 
 #endif//AOC_2021_UTILITIES_HPP
