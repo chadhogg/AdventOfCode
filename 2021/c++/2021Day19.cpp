@@ -231,6 +231,10 @@ std::unordered_map<Index, Index> mapBeacons (Scanner const& done, Scanner const&
                     if (matchB.first.first == doneIndex || matchB.first.second == doneIndex) {
                         Index matchBDoneOther = (matchB.first.first == doneIndex ? matchB.first.second : matchB.first.first);
                         if (matchADoneOther != matchBDoneOther) {
+                            if (matchA.second.first != matchB.second.first && matchA.second.first != matchB.second.second && matchA.second.second != matchB.second.first && matchA.second.second != matchB.second.second) {
+                                std::cout << "Weirdly, found a match between " << matchA.first << " and " << matchB.first << " but not " << matchA.second << " and " << matchB.second << "\n";
+                                break;
+                            }
                             // We have found two different pairs the involve the index we are currently working on.
                             Index otherIndex = findCommonIndex (doneIndex, matchA, matchB);
                             if (doneToOther.find (doneIndex) == doneToOther.end ()) {
@@ -239,8 +243,14 @@ std::unordered_map<Index, Index> mapBeacons (Scanner const& done, Scanner const&
                             if (otherToDone.find (otherIndex) == otherToDone.end ()) {
                                 otherToDone.insert ({otherIndex, doneIndex});
                             }
-                            assert (doneToOther.at (doneIndex) == otherIndex);
-                            assert (otherToDone.at (otherIndex) == doneIndex);
+                            if (doneToOther.at (doneIndex) != otherIndex) {
+                                std::cout << "Hmm, beacon " << doneIndex << " seems to be mappable to both " << doneToOther.at (doneIndex) << " and to " << otherIndex << "\n";
+                                doneToOther.erase (doneIndex);
+                            }
+                            if (otherToDone.at (otherIndex) != doneIndex) {
+                                std::cout << "Hmm, beacon " << otherIndex << " seems to be mappable from both " << otherToDone.at (otherIndex) << " and from " << doneIndex << "\n";
+                                otherToDone.erase (otherIndex);
+                            }
                         }
                     }
                 }
