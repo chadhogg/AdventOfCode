@@ -16,19 +16,31 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <cmath>
 
 #include "utilities.hpp"
 
-// Stolen from my computer graphics course.
-#include "Vector3.hpp"
 
 
-inline bool approxEqual (double x, double y) {
-    return std::abs (x - y) < 0.01;
-}
 
+struct Vec3 {
+    long m_x;
+    long m_y;
+    long m_z;
+
+    double distance (Vec3 const& other) const {
+        long xDiff = m_x - other.m_x;
+        long yDiff = m_y - other.m_y;
+        long zDiff = m_z - other.m_z;
+        return sqrt (xDiff * xDiff + yDiff * yDiff + zDiff * zDiff);
+    }
+};
 
 namespace matrix {
+    inline bool approxEqual (double x, double y) {
+        return std::abs (x - y) < 0.01;
+    }
+    
     using Matrix = std::vector<std::vector<double>>;
 
     void swapRows (Matrix & matrix, unsigned int rowIndexA, unsigned int rowIndexB) {
@@ -123,16 +135,16 @@ namespace matrix {
     }
 };
 
-Vector3 multiply (matrix::Matrix const& transform, Vector3 const& input) {
-    Vector3 result;
-    result.m_x = transform.at (0).at (0) * input.m_x + transform.at (0).at (1) * input.m_y + transform.at (0).at (2) * input.m_z + transform.at (0).at (3);
-    result.m_y = transform.at (1).at (0) * input.m_x + transform.at (1).at (1) * input.m_y + transform.at (1).at (2) * input.m_z + transform.at (1).at (3);
-    result.m_z = transform.at (2).at (0) * input.m_x + transform.at (2).at (1) * input.m_z + transform.at (2).at (2) * input.m_z + transform.at (2).at (3);
+Vec3 multiply (matrix::Matrix const& transform, Vec3 const& input) {
+    Vec3 result;
+    result.m_x = lrint (transform.at (0).at (0) * input.m_x + transform.at (0).at (1) * input.m_y + transform.at (0).at (2) * input.m_z + transform.at (0).at (3));
+    result.m_y = lrint (transform.at (1).at (0) * input.m_x + transform.at (1).at (1) * input.m_y + transform.at (1).at (2) * input.m_z + transform.at (1).at (3));
+    result.m_z = lrint (transform.at (2).at (0) * input.m_x + transform.at (2).at (1) * input.m_z + transform.at (2).at (2) * input.m_z + transform.at (2).at (3));
     return result;
 }
 
 
-using Beacon = Vector3;
+using Beacon = Vec3;
 using Index = unsigned int;
 using ScanID = unsigned int;
 using Distance = double;
@@ -142,7 +154,7 @@ struct Scanner {
     unsigned int m_id;
     std::vector<Beacon> m_beacons;
     std::unordered_map<Distance, IndexPair> m_distances;
-    Vector3 m_location;
+    Vec3 m_location;
 };
 
 using SomeScanners = std::unordered_map<ScanID, Scanner>;
@@ -168,8 +180,8 @@ SomeScanners getInput () {
         }
         else {
             assert (workingOnScanner);
-            double x, y, z;
-            int count = sscanf (line.c_str (), "%lf,%lf,%lf", &x, &y, &z);
+            long x, y, z;
+            int count = sscanf (line.c_str (), "%ld,%ld,%ld", &x, &y, &z);
             assert (count == 3);
             scanner.m_beacons.push_back ({x, y, z});
         }
@@ -181,8 +193,7 @@ SomeScanners getInput () {
     for (std::pair<const ScanID, Scanner> & current : scanners) {
         for (Index index1 {0U}; index1 < current.second.m_beacons.size (); ++index1) {
             for (Index index2 {index1 + 1U}; index2 < current.second.m_beacons.size (); ++index2) {
-                Vector3 oneToOther = current.second.m_beacons.at (index1) - current.second.m_beacons.at (index2);
-                Distance distance = oneToOther.length ();
+                Distance distance = current.second.m_beacons.at (index1).distance (current.second.m_beacons.at (index2));
                 assert (current.second.m_distances.find (distance) == current.second.m_distances.end ());
                 current.second.m_distances.insert ({distance, {index1, index2}});
             }
