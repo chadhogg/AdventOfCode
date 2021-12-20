@@ -38,9 +38,9 @@ struct Vec3 {
 
 namespace matrix {
     inline bool approxEqual (double x, double y) {
-        return std::abs (x - y) < 0.01;
+        return std::abs (x - y) < 0.00001;
     }
-    
+
     using Matrix = std::vector<std::vector<double>>;
 
     void swapRows (Matrix & matrix, unsigned int rowIndexA, unsigned int rowIndexB) {
