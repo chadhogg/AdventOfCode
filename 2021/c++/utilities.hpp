@@ -74,6 +74,8 @@ struct Coordinate {
     /// Horizontal position -- left is 0, increases as you go right.
     int col;
 
+    Coordinate () = default;
+
     /// \brief Constructs a coordinate.
     /// \param[in] r The row.
     /// \param[in] c The col.
