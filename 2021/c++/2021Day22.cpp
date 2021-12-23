@@ -16,31 +16,9 @@
 struct Region {
     int m_minX, m_maxX, m_minY, m_maxY, m_minZ, m_maxZ;
     bool m_on;
-    std::vector<Region> m_holes;
-
-    unsigned long long sizeIgnoringHoles () const {
-        return (unsigned long long)(m_maxX - m_minX + 1) * (unsigned long long)(m_maxY - m_minY + 1) * (unsigned long long)(m_maxZ - m_minZ + 1);
-    }
 
     unsigned long long size () const {
-        unsigned long long count = sizeIgnoringHoles ();
-        for (Region const& hole : m_holes) {
-            count -= hole.size ();
-        }
-        return count;
-    }
-
-    void processNewRegions (std::vector<Region> & newRegions) {
-        std::vector<Region> revisedNewRegions;
-        for (Region const& region : newRegions) {
-            if (region.m_on == m_on) {
-                revisedNewRegions.push_back (region);
-            }
-            else {
-                // TODO
-            }
-        }
-        newRegions = revisedNewRegions;
+        return (unsigned long long)(m_maxX - m_minX + 1) * (unsigned long long)(m_maxY - m_minY + 1) * (unsigned long long)(m_maxZ - m_minZ + 1);
     }
 
     bool intersects (Region const& other) const {
@@ -76,7 +54,7 @@ struct Region {
 
         if (m_maxY > other.m_maxY) {
             topPlane = other.m_maxY;
-            regions.push_back ({m_minX, m_maxX, other.m_maxY + 1, m_maxY, m_minZ, m_maxZ, m_on, {}});
+            regions.push_back ({m_minX, m_maxX, other.m_maxY + 1, m_maxY, m_minZ, m_maxZ, m_on});
             assert (regions.back ().isValid ());
         }
         else {
@@ -85,7 +63,7 @@ struct Region {
 
         if (m_minY < other.m_minY) {
             bottomPlane = other.m_minY;
-            regions.push_back ({m_minX, m_maxX, m_minY, other.m_minY - 1, m_minZ, m_maxZ, m_on, {}});
+            regions.push_back ({m_minX, m_maxX, m_minY, other.m_minY - 1, m_minZ, m_maxZ, m_on});
             assert (regions.back ().isValid ());
         }
         else {
@@ -94,7 +72,7 @@ struct Region {
 
         if (m_minX < other.m_minX) {
             leftPlane = other.m_minX;
-            regions.push_back ({m_minX, other.m_minX - 1, bottomPlane, topPlane, m_minZ, m_maxZ, m_on, {}});
+            regions.push_back ({m_minX, other.m_minX - 1, bottomPlane, topPlane, m_minZ, m_maxZ, m_on});
             assert (regions.back ().isValid ());
         }
         else {
@@ -103,7 +81,7 @@ struct Region {
 
         if (m_maxX > other.m_maxX) {
             rightPlane = other.m_maxX;
-            regions.push_back ({other.m_maxX + 1, m_maxX, bottomPlane, topPlane, m_minZ, m_maxZ, m_on, {}});
+            regions.push_back ({other.m_maxX + 1, m_maxX, bottomPlane, topPlane, m_minZ, m_maxZ, m_on});
             assert (regions.back ().isValid ());
         }
         else {
@@ -111,12 +89,12 @@ struct Region {
         }
 
         if (m_minZ < other.m_minZ) {
-            regions.push_back ({leftPlane, rightPlane, bottomPlane, topPlane, m_minZ, other.m_minZ - 1, m_on, {}});
+            regions.push_back ({leftPlane, rightPlane, bottomPlane, topPlane, m_minZ, other.m_minZ - 1, m_on});
             assert (regions.back ().isValid ());
         }
 
         if (m_maxZ > other.m_maxZ) {
-            regions.push_back ({leftPlane, rightPlane, bottomPlane, topPlane, other.m_maxZ + 1, m_maxZ, m_on, {}});
+            regions.push_back ({leftPlane, rightPlane, bottomPlane, topPlane, other.m_maxZ + 1, m_maxZ, m_on});
             assert (regions.back ().isValid ());
         }
 
@@ -181,18 +159,6 @@ unsigned long part1BruteForce (Steps const& steps) {
     return count;
 }
 
-Region boundingBox (Steps const& steps) {
-    Region box {INT_MAX, INT_MIN, INT_MAX, INT_MIN, INT_MAX, INT_MIN, false, {}};
-    for (Region const& step : steps) {
-        box.m_minX = std::min (box.m_minX, step.m_minX);
-        box.m_maxX = std::max (box.m_maxX, step.m_maxX);
-        box.m_minY = std::min (box.m_minY, step.m_minY);
-        box.m_maxY = std::max (box.m_maxY, step.m_maxY);
-        box.m_minZ = std::min (box.m_minZ, step.m_minZ);
-        box.m_maxZ = std::max (box.m_maxZ, step.m_maxZ);
-    }
-    return box;
-}
 
 unsigned long long addSizes (std::vector<Region> const& regions) {
     unsigned long long count {0ULL};
@@ -256,11 +222,8 @@ std::vector<Region> process (std::vector<Region> const& onRegions, Region const&
 unsigned long long part2Dos (Steps const& steps) {
     std::vector<Region> onRegions;
 
-    unsigned int x {0U};
     for (Region const& step : steps) {
         onRegions = process (onRegions, step);
-        std::cout << " Finished step (" << x << "/" << steps.size () << ")\n";
-        ++x;
     }
 
     return addSizes (onRegions);
