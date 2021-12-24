@@ -13,6 +13,7 @@
 #include <climits>
 #include <unordered_set>
 #include <unordered_map>
+#include <sstream>
 
 #include "utilities.hpp"
 
@@ -25,6 +26,8 @@ constexpr int AMBER_SIDE_COL = 3;
 constexpr int BRONZE_SIDE_COL = 5;
 constexpr int COPPER_SIDE_COL = 7;
 constexpr int DESERT_SIDE_COL = 9;
+constexpr int MORE_LOWER_SIDE_ROW = 4;
+constexpr int MOST_LOWER_SIDE_ROW = 5;
 
 enum AmphipodType { AMBER, BRONZE, COPPER, DESERT };
 
@@ -72,14 +75,14 @@ struct Amphipod {
         }
     }
 
-    bool isWhereItShouldBe () const {
-        return (m_where.row == LOWER_SIDE_ROW || m_where.row == UPPER_SIDE_ROW) && m_where.col == getGoalCol ();
-    }
-
-    bool hasValidPosition () const {
+    bool hasValidPosition (bool part2) const {
         if (m_where.row == HALL_ROW && m_where.col >= FIRST_HALL_COL && m_where.col <= LAST_HALL_COL) { return true; }
         if (m_where.row == LOWER_SIDE_ROW && (m_where.col == AMBER_SIDE_COL || m_where.col == BRONZE_SIDE_COL || m_where.col == COPPER_SIDE_COL || m_where.col == DESERT_SIDE_COL)) { return true; }
         if (m_where.row == UPPER_SIDE_ROW && (m_where.col == AMBER_SIDE_COL || m_where.col == BRONZE_SIDE_COL || m_where.col == COPPER_SIDE_COL || m_where.col == DESERT_SIDE_COL)) { return true; }
+        if (part2) {
+            if (m_where.row == MORE_LOWER_SIDE_ROW && (m_where.col == AMBER_SIDE_COL || m_where.col == BRONZE_SIDE_COL || m_where.col == COPPER_SIDE_COL || m_where.col == DESERT_SIDE_COL)) { return true; }
+            if (m_where.row == MOST_LOWER_SIDE_ROW && (m_where.col == AMBER_SIDE_COL || m_where.col == BRONZE_SIDE_COL || m_where.col == COPPER_SIDE_COL || m_where.col == DESERT_SIDE_COL)) { return true; }
+        }
         return false;
     }
 };
@@ -87,23 +90,24 @@ struct Amphipod {
 struct GameState {
     std::vector<Amphipod> pods;
     unsigned int energyUsed;
+    bool part2;
 
     bool isGoal () const {
-        assert (pods.size () == 8);
         for (Amphipod const& pod : pods) {
-            if (!pod.isWhereItShouldBe ()) { return false; }
+            if (!isInFinalPosition (pod)) { return false; }
         }
         return true;
     }
 
     bool isValid () const {
-        if (pods.size () != 8) { return false; }
+        if (pods.size () != 8U * (part2 + 1U)) { return false; }
         std::unordered_map<AmphipodType, unsigned int> counts { {AMBER, 0U}, {BRONZE, 0U}, {COPPER, 0U}, {DESERT, 0U}};
         for (Amphipod const& pod : pods) {
-            if (!pod.hasValidPosition ()) { return false; }
+            if (!pod.hasValidPosition (part2)) { return false; }
             ++counts[pod.m_type];
         }
-        if (counts.at (AMBER) != 2 || counts.at (BRONZE) != 2 || counts.at (COPPER) != 2 || counts.at (DESERT) != 2) { return false; }
+        unsigned int goal {2U * (part2 + 1U)};
+        if (counts.at (AMBER) != goal || counts.at (BRONZE) != goal || counts.at (COPPER) != goal || counts.at (DESERT) != goal) { return false; }
         for (unsigned int index1 {0U}; index1 < pods.size (); ++index1) {
             for (unsigned int index2 {index1 + 1}; index2 < pods.size (); ++index2) {
                 if (pods.at (index1).m_where == pods.at (index2).m_where) { return false; }
@@ -130,6 +134,41 @@ struct GameState {
         return result;
     }
 
+    std::string toString () const {
+        constexpr int FIRST_ROW {0};
+        constexpr int LAST_ROW {4};
+        constexpr int FIRST_COL {0};
+        constexpr int LAST_COL {12};
+        std::stringstream out;
+        for (int row = FIRST_ROW; row <= LAST_ROW; ++row) {
+            for (int col = FIRST_COL; col <= LAST_COL; ++col) {
+                if ((row == 0) ||
+                    (row == 1 && (col == FIRST_COL || col == LAST_COL)) ||
+                    (row == 2 && (col <= 2 || col == 4 || col == 6 || col == 8 || col >= 10)) ||
+                    (row == 3 && (col == 2 || col == 4 || col == 6 || col == 8 || col == 10)) ||
+                    (row == 4 && col >= 2 && col <= 10)) {
+                    out << "#";
+                }
+                else if (row >= 3 && (col < 2 || col > 10)) {
+                    out << " ";
+                }
+                else {
+                    bool found = false;
+                    for (Amphipod const& pod : pods) {
+                        if (pod.m_where.row == row && pod.m_where.col == col) {
+                            out << pod.getSymbol ();
+                            found = true;
+                        }
+                    }
+                    if (!found) { out << "."; }
+                }
+            }
+            out << "\n";
+        }
+        out << energyUsed << "E\n";
+        return out.str ();
+    }
+
 private:
 
     Amphipod & findAmphipod (Coordinate const& where) {
@@ -145,25 +184,50 @@ private:
         }
         throw std::runtime_error ("Couldn't find amphipod.");
     }
-    bool isInFinalPosition (Amphipod const& pod) const {
-        if (pod.m_where.col != pod.getGoalCol ()) { return false; }
+
+    inline int lowestRow () const {
+        return part2 ? MOST_LOWER_SIDE_ROW : LOWER_SIDE_ROW;
+    }
+
+    bool allBelowSpotsSet (Coordinate const& loc) const {
+        if (loc.row >= lowestRow ()) {
+            return true;
+        }
         else {
-            if (pod.m_where.row == LOWER_SIDE_ROW) { return true; }
-            else if (pod.m_where.row == UPPER_SIDE_ROW) {
-                Coordinate below {pod.m_where.row + 1, pod.m_where.col};
-                if (!isSpaceOpen (below) && findAmphipod (below).m_type == pod.m_type) { return true; }
+            Coordinate below {loc.row + 1, loc.col};
+            if (isSpaceOpen (below)) { return false; }
+            else {
+                Amphipod const& amph = findAmphipod (below);
+                if (amph.m_where.col == amph.getGoalCol ()) {
+                    return allBelowSpotsSet (below);
+                }
                 else { return false; }
             }
-            else { return false; }
         }
     }
+
+    bool isInFinalPosition (Amphipod const& pod) const {
+        if (pod.m_where.col != pod.getGoalCol ()) { return false; }
+        else { return pod.m_where.row != HALL_ROW && allBelowSpotsSet (pod.m_where); }
+    }
+
+    bool homeIsOK (Amphipod const& pod) const {
+        for (int row = lowestRow (); row > HALL_ROW; --row) {
+            if (isSpaceOpen ({row, pod.getGoalCol ()})) { return true; }
+            if (findAmphipod ({row, pod.getGoalCol ()}).m_type != pod.m_type) { return false; }
+        }
+        return true;
+    }
+
+// above here refactored
+
+
 
     std::vector<GameState> getHallwayToHomeMoves () const {
         std::vector<GameState> successors;
         for (Amphipod const& amph : pods) {
             if (amph.m_where.row != HALL_ROW) { continue; }
-            if (!isSpaceOpen ({UPPER_SIDE_ROW, amph.getGoalCol ()})) { continue; }
-            if (!isSpaceOpen ({LOWER_SIDE_ROW, amph.getGoalCol ()}) && findAmphipod ({LOWER_SIDE_ROW, amph.getGoalCol ()}).m_type != amph.m_type) { continue; }
+            if (!homeIsOK (amph)) { continue; }
             GameState successor {*this};
             Amphipod& current = successor.findAmphipod (amph.m_where);
             if (successor.moveHomeOrDieTrying (current)) {
@@ -180,6 +244,7 @@ private:
             if (amph.m_where.col == amph.getGoalCol ()) { continue; }
             if (!isSpaceOpen ({UPPER_SIDE_ROW, amph.getGoalCol ()})) { continue; }
             if (!isSpaceOpen ({LOWER_SIDE_ROW, amph.getGoalCol ()}) && findAmphipod ({LOWER_SIDE_ROW, amph.getGoalCol ()}).m_type != amph.m_type) { continue; }
+            if (part2 && !isSpaceOpen ({MORE_LOWER_SIDE_ROW, amph.getGoalCol ()}) && findAmphipod ({MORE_LOWER_SIDE_ROW, amph.getGoalCol ()}).m_type != amph.m_type) { continue; }
             GameState successor {*this};
             Amphipod& current = successor.findAmphipod (amph.m_where);
             if (successor.moveIntoHallwayOrDieTrying (current) && successor.moveHomeOrDieTrying (current)) {
@@ -239,7 +304,7 @@ private:
 
     bool moveIntoHallwayOrDieTrying (Amphipod & pod) {
         assert (pod.m_where.row != HALL_ROW);
-        if (pod.m_where.row == LOWER_SIDE_ROW) {
+        while (pod.m_where.row != HALL_ROW) {
             Coordinate north {pod.m_where.row - 1, pod.m_where.col};
             if (isSpaceOpen (north)) {
                 pod.m_where = north;
@@ -247,13 +312,15 @@ private:
             }
             else { return false; }
         }
-        Coordinate north {pod.m_where.row - 1, pod.m_where.col};
-        if (isSpaceOpen (north)) {
-            pod.m_where = north;
-            energyUsed += pod.getEnergyPerStep ();
-            return true;
+        return true;
+    }
+
+    int homeRow (Amphipod const& pod) const {
+        int row = lowestRow ();
+        while (!isSpaceOpen ({row, pod.getGoalCol ()})) {
+            --row;
         }
-        else { return false; }
+        return row;
     }
 
     bool moveHomeOrDieTrying (Amphipod & pod) {
@@ -274,21 +341,14 @@ private:
             }
             else { return false; }
         }
-        Coordinate below {pod.m_where.row + 1, pod.m_where.col};
-        if (isSpaceOpen (below)) {
+        int targetRow = homeRow (pod);
+        while (pod.m_where.row != targetRow) {
+            Coordinate below {pod.m_where.row + 1, pod.m_where.col};
+            assert (isSpaceOpen (below));
             pod.m_where = below;
             energyUsed += pod.getEnergyPerStep ();
         }
-        else { return false; }
-        below = {pod.m_where.row + 1, pod.m_where.col};
-        if (isSpaceOpen (below)) {
-            pod.m_where = below;
-            energyUsed += pod.getEnergyPerStep ();
-        }
-        else {
-            assert (findAmphipod (below).m_type == pod.m_type);
-        }
-        return true;
+        return isInFinalPosition (pod);
     }
 };
 
@@ -333,36 +393,7 @@ struct std::hash<GameState> {
 };
 
 std::ostream & operator<< (std::ostream & out, GameState const& state) {
-    constexpr int FIRST_ROW {0};
-    constexpr int LAST_ROW {4};
-    constexpr int FIRST_COL {0};
-    constexpr int LAST_COL {12};
-    for (int row = FIRST_ROW; row <= LAST_ROW; ++row) {
-        for (int col = FIRST_COL; col <= LAST_COL; ++col) {
-            if ((row == 0) ||
-                (row == 1 && (col == FIRST_COL || col == LAST_COL)) ||
-                (row == 2 && (col <= 2 || col == 4 || col == 6 || col == 8 || col >= 10)) ||
-                (row == 3 && (col == 2 || col == 4 || col == 6 || col == 8 || col == 10)) ||
-                (row == 4 && col >= 2 && col <= 10)) {
-                out << "#";
-            }
-            else if (row >= 3 && (col < 2 || col > 10)) {
-                out << " ";
-            }
-            else {
-                bool found = false;
-                for (Amphipod const& pod : state.pods) {
-                    if (pod.m_where.row == row && pod.m_where.col == col) {
-                        out << pod.getSymbol ();
-                        found = true;
-                    }
-                }
-                if (!found) { out << "."; }
-            }
-        }
-        out << "\n";
-    }
-    out << state.energyUsed << "E\n";
+    out << state.toString ();
     return out;
 }
 
@@ -384,8 +415,34 @@ GameState getInput () {
         state.pods.push_back ({amph, typeFromSymbol (lines[amph.row].at (amph.col))});
     }
     state.energyUsed = 0U;
+    state.part2 = false;
     assert (state.isValid ());
     return state;
+}
+
+GameState expand (GameState const& original) {
+    GameState big {};
+    for (Amphipod const& pod : original.pods) {
+        if (pod.m_where.row == UPPER_SIDE_ROW) {
+            big.pods.push_back (pod);
+        }
+        else {
+            big.pods.push_back ({{MOST_LOWER_SIDE_ROW, pod.m_where.col}, pod.m_type});
+        }
+    }
+
+    big.pods.push_back ({{LOWER_SIDE_ROW, AMBER_SIDE_COL}, DESERT});
+    big.pods.push_back ({{MORE_LOWER_SIDE_ROW, AMBER_SIDE_COL}, DESERT});
+    big.pods.push_back ({{LOWER_SIDE_ROW, BRONZE_SIDE_COL}, COPPER});
+    big.pods.push_back ({{MORE_LOWER_SIDE_ROW, BRONZE_SIDE_COL}, BRONZE});
+    big.pods.push_back ({{LOWER_SIDE_ROW, COPPER_SIDE_COL}, BRONZE});
+    big.pods.push_back ({{MORE_LOWER_SIDE_ROW, COPPER_SIDE_COL}, AMBER});
+    big.pods.push_back ({{LOWER_SIDE_ROW, DESERT_SIDE_COL}, AMBER});
+    big.pods.push_back ({{MORE_LOWER_SIDE_ROW, DESERT_SIDE_COL}, COPPER});
+
+    big.part2 = true;
+    assert (big.isValid ());
+    return big;
 }
 
 unsigned int part1 (GameState const& initial) {
@@ -414,10 +471,6 @@ unsigned int part1 (GameState const& initial) {
                     seen[successor] = successor.energyUsed;
                     frontier.push_back (successor);
                 }
-                else {
-                    //std::cout << "Not adding to frontier because cheaper version exists.\n";
-                    //std::cout << successor << "\n";
-                }
             }
         }
     }
@@ -428,7 +481,8 @@ unsigned int part1 (GameState const& initial) {
 /// \return Always 0.
 int main () {
     GameState initial = getInput ();
-    std::cout << initial << "\n";
     std::cout << part1 (initial) << "\n";
+    GameState expanded = expand (initial);
+    std::cout << part1 (expanded) << "\n";
     return 0;
 }
