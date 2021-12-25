@@ -12,7 +12,7 @@ PROGRAMS = $(subst .cpp,.out,$(SOURCES))
 
 all : $(PROGRAMS)
 
-%.out : %.cpp utilities.hpp
+%.out : %.cpp utilities.hpp intcode.hpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 clean :
