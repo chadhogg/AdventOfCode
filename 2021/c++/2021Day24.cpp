@@ -2,10 +2,13 @@
 /// \author Chad Hogg
 /// \brief My solution to https://adventofcode.com/2021/day/24.
 
+#define NDEBUG
+
 #include <iostream>
 #include <string>
 #include <vector>
 #include <cassert>
+#include <unordered_set>
 
 #include "utilities.hpp"
 
@@ -14,11 +17,31 @@ inline bool isRegister (std::string const& str) {
 }
 
 struct VMState {
-    int w, x, y, z;
-    std::vector<int> unreadInput;
-    VMState () : w {0}, x {0}, y {0}, z {0}, unreadInput {} {};
-    VMState (int a, int b, int c, int d, std::vector<int> u)
-        : w {a}, x {b}, y {c}, z {d}, unreadInput {u} {}
+    short w, y;
+    int x, z;
+    //int w, x, y, z;
+    std::string input;
+    unsigned short consumed;
+    VMState () : w {0}, x {0}, y {0}, z {0}, input {}, consumed {0U} {};
+    VMState (int ww, int xx, int yy, int zz, std::string i, unsigned int c)
+        : w (ww), x (xx), y (yy), z (zz), input {i}, consumed (c) {}
+};
+
+// NOTE: We very deliberately don't consider the input as relevant, because we are goin to be building it iteratively and only want to keep largest.
+bool operator== (VMState const& first, VMState const& second) {
+    return first.w == second.w && first.x == second.x && first.y == second.y && first.z == second.z;
+}
+
+template<>
+struct std::hash<VMState> {
+    std::size_t operator() (VMState const& state) const {
+        std::size_t hash = 17;
+        hash = hash * 31 + state.w;
+        hash = hash * 31 + state.x;
+        hash = hash * 31 + state.y;
+        hash = hash * 31 + state.z;
+        return hash;
+    }
 };
 
 struct Instruction {
@@ -37,9 +60,9 @@ struct Instruction {
     }
 
     void executeInput (VMState & state) const {
-        assert (!state.unreadInput.empty ());
-        int value = state.unreadInput.at (0);
-        state.unreadInput.erase (state.unreadInput.begin ());
+        assert (state.consumed < state.input.size ());
+        int value = state.input.at (state.consumed) - '0';
+        ++state.consumed;
         assert (value >= 1 && value <= 9);
         setValue (op1, value, state);
     }
@@ -158,10 +181,10 @@ bool validateAllBeliefs (Program const& prog) {
     assert (z != 0);
     if (!validateBelief (prog, index,
         {
-            {0, 0, 0, 0, {}}
+            {0, 0, 0, 0, "", 0U}
         },
         {
-            {0, 0, 0, 1, {}}
+            {0, 0, 0, 1, "", 0U}
         }
     )) { return false; }
     --index;
@@ -181,14 +204,14 @@ bool validateAllBeliefs (Program const& prog) {
     assert (z != y);
     if (!validateBelief (prog, index,
         {
-            {0, 0, 0, 0, {}},
-            {0, 0, 5, -5, {}},
-            {1, 3, -2, 2, {}}
+            {0, 0, 0, 0, "", 0U},
+            {0, 0, 5, -5, "", 0U},
+            {1, 3, -2, 2, "", 0U}
         },
         {
-            {0, 1, 2, 3, {}},
-            {4, 3, 2, 0, {}},
-            {1, -1, 0, 3, {}}
+            {0, 1, 2, 3, "", 0U},
+            {4, 3, 2, 0, "", 0U},
+            {1, -1, 0, 3, "", 0U}
         }
     )) { return false; }
     --index;
@@ -208,14 +231,14 @@ bool validateAllBeliefs (Program const& prog) {
     assert (z != -(y * x));
     if (!validateBelief (prog, index,
         {
-            {0, 0, 0, 0, {}},
-            {0, -1, 5, 5, {}},
-            {0, 2, 2, -4, {}}
+            {0, 0, 0, 0, "", 0U},
+            {0, -1, 5, 5, "", 0U},
+            {0, 2, 2, -4, "", 0U}
         },
         {
-            {1, 2, 3, 4, {}},
-            {1, 2, 2, 4, {}},
-            {1, -2, -2, 4, {}}
+            {1, 2, 3, 4, "", 0U},
+            {1, 2, 2, 4, "", 0U},
+            {1, -2, -2, 4, "", 0U}
         }
     )) { return false; }
     --index;
@@ -235,14 +258,14 @@ bool validateAllBeliefs (Program const& prog) {
     assert (z != -((y + 11) * x));
     if (!validateBelief (prog, index,
         {
-            {0, 0, 11, 0, {}},
-            {20, 5, -1, -50, {}},
-            {0, -3, -7, 12, {}}
+            {0, 0, 11, 0, "", 0U},
+            {20, 5, -1, -50, "", 0U},
+            {0, -3, -7, 12, "", 0U}
         },
         {
-            {0, 1, 2, 0, {}},
-            {1, 2, 3, 4, {}},
-            {0, 2, 2, -4, {}}
+            {0, 1, 2, 0, "", 0U},
+            {1, 2, 3, 4, "", 0U},
+            {0, 2, 2, -4, "", 0U}
         }
     )) { return false; }
     --index;
@@ -252,13 +275,76 @@ bool validateAllBeliefs (Program const& prog) {
     return true;
 }
 
+void addIfMissingReplaceIfMoreExtreme (std::unordered_set<VMState> & set, VMState const& state, bool largest) {
+    auto iter = set.find (state);
+    if (iter == set.end ()) {
+        set.insert (state);
+    }
+    else {
+        VMState const& other = *iter;
+        if ((largest && state.input > other.input) || (!largest && state.input < other.input)) {
+            set.erase (iter);
+            set.insert (state);
+        }
+    }
+}
+
+std::string findMostExtreme (std::unordered_set<VMState> const& set, bool largest) {
+    if (largest) {
+        std::string best = "11111111111111";
+        for (VMState const& state : set) {
+            if (state.z != 0) { continue; }
+            if (state.input > best) { best = state.input; }
+        }
+        return best;
+    }
+    else {
+        std::string best = "99999999999999";
+        for (VMState const& state : set) {
+            if (state.z != 0) { continue; }
+            if (state.input < best) { best = state.input; }
+        }
+        return best;
+    }
+}
+
+std::string findExtremeValidValue (Program const& prog, bool largest) {
+    std::unordered_set<VMState> inputs;
+    inputs.insert ({0, 0, 0, 0, "", 0U});
+    unsigned int count {0U};
+    for (Instruction const& inst : prog) {
+        std::unordered_set<VMState> outputs;
+        for (VMState state : inputs) {
+            if (inst.opcode == "inp") {
+                for (char input = '1'; input <= '9'; ++input) {
+                    if (state.consumed == 0 && input != '1') { continue; }
+                    VMState successor {state};
+                    successor.input += input;
+                    inst.execute (successor);
+                    addIfMissingReplaceIfMoreExtreme (outputs, successor, largest);
+                }
+            }
+            else {
+                inst.execute (state);
+                addIfMissingReplaceIfMoreExtreme (outputs, state, largest);
+            }
+        }
+        std::cout << "After instruction " << count << " there are " << outputs.size () << " distinct possible states.\n";
+        inputs = outputs;
+        ++count;
+    }
+    return findMostExtreme (inputs, largest);
+}
+
 /// \brief Runs the program.
 /// \return Always 0.
 int main () {
     Program prog = getInput ();
-    std::cout << prog.size () << "\n";
-    std::cout << valid (prog, {0, 0, 0, 0, {9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9}}) << "\n";
-    validateAllBeliefs (prog);
+    //std::cout << prog.size () << "\n";
+    //std::cout << valid (prog, {0, 0, 0, 0, "99998239999696", 0U}) << "\n";
+    //validateAllBeliefs (prog);
+    //std::cout << findExtremeValidValue (prog, true) << "\n";
+    std::cout << findExtremeValidValue (prog, false) << "\n";
     return 0;
 }
 
