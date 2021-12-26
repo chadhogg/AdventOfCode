@@ -34,6 +34,10 @@ constexpr Number OPCODE_ADD = 1;
 constexpr Number OPCODE_MULT = 2;
 constexpr Number OPCODE_INPUT = 3;
 constexpr Number OPCODE_OUTPUT = 4;
+constexpr Number OPCODE_JTRUE = 5;
+constexpr Number OPCODE_JFALSE = 6;
+constexpr Number OPCODE_LT = 7;
+constexpr Number OPCODE_EQ = 8;
 constexpr Number OPCODE_HALT = 99;
 
 
@@ -42,7 +46,12 @@ inline unsigned int valuesInInstruction (Number opcode) {
     switch (opcode) {
         case OPCODE_ADD:
         case OPCODE_MULT:
+        case OPCODE_LT:
+        case OPCODE_EQ:
             return 4U;
+        case OPCODE_JTRUE:
+        case OPCODE_JFALSE:
+            return 3U;
         case OPCODE_INPUT:
         case OPCODE_OUTPUT:
             return 2U;
@@ -60,7 +69,11 @@ inline bool isValidOpcode (Number num) {
         num == OPCODE_MULT ||
         num == OPCODE_HALT ||
         num == OPCODE_INPUT ||
-        num == OPCODE_OUTPUT;
+        num == OPCODE_OUTPUT ||
+        num == OPCODE_JTRUE ||
+        num == OPCODE_JFALSE ||
+        num == OPCODE_LT ||
+        num == OPCODE_EQ;
 }
 
 
@@ -122,7 +135,7 @@ ICComputer::ICComputer ()
 : m_memory {}, m_instPointer {0U}, m_terminated {true}, m_inputs {}, m_inputPointer {0U}, m_outputs {} {
 }
 
-ICComputer::ICComputer (NumbersList const& prog, std::vector<Number> const& inputs)
+ICComputer::ICComputer (NumbersList const& prog, NumbersList const& inputs)
 : ICComputer {} {
     loadProgram (prog, inputs);
 }
@@ -133,7 +146,7 @@ ICComputer::ICComputer (std::string const& prog, std::string const& inputs)
 
 
 
-void ICComputer::loadProgram (NumbersList const& prog, std::vector<Number> const& inputs) {
+void ICComputer::loadProgram (NumbersList const& prog, NumbersList const& inputs) {
     m_memory = prog;
     m_instPointer = 0U;
     m_terminated = false;
@@ -158,6 +171,7 @@ int ICComputer::readSecondOperand (Number instruction) const {
 void ICComputer::executeNextInstruction () {
     Number instruction = m_memory.at (m_instPointer);
     Number opcode = extractOpcode (instruction);
+    bool modifiedIP = false;
     if (!isValidOpcode (opcode)) { throw std::runtime_error ("Unknown opcode " + std::to_string (opcode)); }
     if (m_terminated) { throw std::runtime_error ("Program has already halted."); }
     switch (opcode) {
@@ -178,6 +192,28 @@ void ICComputer::executeNextInstruction () {
             m_outputs.push_back (readFirstOperand (instruction));
             break;
         }
+        case OPCODE_JTRUE: {
+            if (readFirstOperand (instruction) != 0) {
+                m_instPointer = readSecondOperand (instruction);
+                modifiedIP = true;
+            }
+            break;
+        }
+        case OPCODE_JFALSE: {
+            if (readFirstOperand (instruction) == 0) {
+                m_instPointer = readSecondOperand (instruction);
+                modifiedIP = true;
+            }
+            break;
+        }
+        case OPCODE_LT: {
+            m_memory[m_memory.at (m_instPointer + 3)] = (readFirstOperand (instruction) < readSecondOperand (instruction));
+            break;
+        }
+        case OPCODE_EQ: {
+            m_memory[m_memory.at (m_instPointer + 3)] = (readFirstOperand (instruction) == readSecondOperand (instruction));
+            break;
+        }
         case OPCODE_HALT: {
             m_terminated = true;
            break;
@@ -186,7 +222,7 @@ void ICComputer::executeNextInstruction () {
             throw std::runtime_error ("I haven't implemented opcode " + std::to_string (opcode) + " yet.");
         }
     }
-    m_instPointer += valuesInInstruction (opcode);
+    if (!modifiedIP) { m_instPointer += valuesInInstruction (opcode); }
 }
 
 void ICComputer::executeAllInstructions () {

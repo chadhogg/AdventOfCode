@@ -14,5 +14,8 @@ int main () {
     ICComputer comp {prog, {1}};
     comp.executeAllInstructions ();
     std::cout << comp.getOutputs () << "\n";
+    comp.loadProgram (prog, {5});
+    comp.executeAllInstructions ();
+    std::cout << comp.getOutputs () << "\n";
     return 0;
 }
