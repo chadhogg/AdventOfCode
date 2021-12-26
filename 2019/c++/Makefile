@@ -8,7 +8,7 @@ LDLIBS =
 
 CXX_OPTIONS = -g -Wall
 SOURCES = $(wildcard 2019Day??.cpp)
-PROGRAMS = $(subst .cpp,.out,$(SOURCES))
+PROGRAMS = $(subst .cpp,.out,$(SOURCES)) IntCodeTests.out
 
 all : $(PROGRAMS)
 

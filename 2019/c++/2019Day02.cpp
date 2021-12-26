@@ -13,7 +13,7 @@ void test (std::string input) {
     std::cout << input << " -> " << comp.toString () << "\n";
 }
 
-int search (ICComputer & comp, ICProgram & prog) {
+int search (ICComputer & comp, NumbersList & prog) {
     for (int noun {0}; noun < 99; ++noun) {
         for (int verb {0}; verb < 99; ++verb) {
             prog[1] = noun;
@@ -37,7 +37,7 @@ int main () {
     */
 
     std::string input = read<std::string> ();
-    ICProgram prog = parseProgram (input);
+    NumbersList prog = parseNumbersList (input);
     prog[1] = 12;
     prog[2] = 2;
     ICComputer comp {prog};
