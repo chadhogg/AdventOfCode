@@ -141,4 +141,17 @@ std::string to_string (std::pair<A, B> const& pair) {
 }
 
 
+std::vector<std::string> parseCSV (std::string const& line, char symbol = ',') {
+    std::vector<std::string> parts;
+    auto prev = 0U;
+    auto next = line.find (symbol, prev);
+    while (next != line.npos) {
+        std::string part = line.substr (prev, next - prev);
+        parts.push_back (part);
+        prev = next + 1;
+        next = line.find (symbol, prev);
+    }
+    return parts;
+}
+
 #endif//AOC_2021_UTILITIES_HPP
