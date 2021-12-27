@@ -154,6 +154,7 @@ private:
     Number readParameter (Number instruction, unsigned int index) const;
     Number readMemoryAddress (Number address) const;
     void writeMemoryAddress (Number address, Number value);
+    inline Number computeWriteAddress (Number instruction, unsigned int index) const {return readMemoryAddress (m_instPointer + index) + (extractParamMode (instruction, index) == RELATIVE ? m_relativeBase : 0); }
 
     NumbersList m_memory;
     unsigned int m_instPointer;
@@ -232,15 +233,15 @@ void ICComputer::executeNextInstruction () {
     if (m_terminated) { throw std::runtime_error ("Program has already halted."); }
     switch (opcode) {
         case OPCODE_ADD: {
-            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readParameter (instruction, 1) + readParameter (instruction, 2));
+            writeMemoryAddress (computeWriteAddress (instruction, 3), readParameter (instruction, 1) + readParameter (instruction, 2));
             break;
         }
         case OPCODE_MULT: {
-            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readParameter (instruction, 1) * readParameter (instruction, 2));
+            writeMemoryAddress (computeWriteAddress (instruction, 3), readParameter (instruction, 1) * readParameter (instruction, 2));
             break;
         }
         case OPCODE_INPUT: {
-            writeMemoryAddress (readMemoryAddress (m_instPointer + 1), m_inputs.at (m_inputPointer));
+            writeMemoryAddress (computeWriteAddress (instruction, 1), m_inputs.at (m_inputPointer));
             ++m_inputPointer;
             break;
         }
@@ -263,11 +264,11 @@ void ICComputer::executeNextInstruction () {
             break;
         }
         case OPCODE_LT: {
-            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readParameter (instruction, 1) < readParameter (instruction, 2));
+            writeMemoryAddress (computeWriteAddress (instruction, 3), readParameter (instruction, 1) < readParameter (instruction, 2));
             break;
         }
         case OPCODE_EQ: {
-            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readParameter (instruction, 1) == readParameter (instruction, 2));
+            writeMemoryAddress (computeWriteAddress (instruction, 3), readParameter (instruction, 1) == readParameter (instruction, 2));
             break;
         }
         case OPCODE_RELBASE: {

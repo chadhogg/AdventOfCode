@@ -6,6 +6,7 @@
 #include <iostream>
 
 #include "intcode.hpp"
+#include "utilities.hpp"
 
 bool runMemoryTest (std::string const& program, std::string const& inputs, std::string const& expectedMemory) {
     ICComputer comp {program, inputs};
@@ -53,7 +54,7 @@ void day09Examples () {
     if (!runOutputTest ("109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99", "", {109,1,204,-1,1001,100,1,100,1008,100,16,101,1006,101,0,99})) {
         std::cout << "Day 09 first example failed!\n";
     }
-    if (!runOutputTest ("1102,34915192,34915192,7,4,7,99,0", "", {})) {
+    if (!runOutputTest ("1102,34915192,34915192,7,4,7,99,0", "", {1219070632396864})) {
         std::cout << "Day 09 second example failed!\n";
     }
     if (!runOutputTest ("104,1125899906842624,99", "", {1125899906842624})) {
@@ -64,7 +65,7 @@ void day09Examples () {
 int main () {
     day02Examples ();
     day05Examples ();
-    //day09Examples ();
+    day09Examples ();
     std::cout << "Finished running tests.\n";
     return 0;
 }
