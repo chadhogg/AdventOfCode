@@ -108,12 +108,14 @@ public:
     void loadProgram (NumbersList const& prog, NumbersList const& inputs = {});
     void executeNextInstruction ();
     void executeAllInstructions ();
+    void executeUntilMissingInput ();
+
+    inline void addInput (Number input) { m_inputs.push_back (input); }
 
     inline bool isTerminated () const { return m_terminated; }
     inline unsigned int getInstPointer () const { return m_instPointer; }
     inline int getNumber (unsigned int pos) const { return m_memory.at (pos); }
     inline NumbersList getOutputs () const { return m_outputs; }
-    //inline void setNumber (unsigned int pos, Number value) { m_memory[pos] = value; }
 
     std::string toString () const;
 private:
@@ -231,6 +233,14 @@ void ICComputer::executeAllInstructions () {
     }
 }
 
+void ICComputer::executeUntilMissingInput () {
+    while (!m_terminated) {
+        if (extractOpcode (m_memory[m_instPointer]) == OPCODE_INPUT && m_inputPointer == m_inputs.size ()) {
+            return;
+        }
+        executeNextInstruction ();
+    }
+}
 
 std::string ICComputer::toString () const {
     std::stringstream stream;
