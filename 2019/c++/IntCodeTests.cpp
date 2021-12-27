@@ -64,7 +64,7 @@ void day09Examples () {
 int main () {
     day02Examples ();
     day05Examples ();
-    day09Examples ();
+    //day09Examples ();
     std::cout << "Finished running tests.\n";
     return 0;
 }

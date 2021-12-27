@@ -12,23 +12,52 @@
 
 using Number = long;
 
+enum ParamMode {ABSOLUTE = 0, IMMEDIATE = 1, RELATIVE = 2};
+
 inline Number extractOpcode (Number instruction) {
     return instruction % 100;
 }
 
+/*
 inline bool firstParamIsImmediate (Number instruction) {
-    return instruction % 1000 / 100;
+    return instruction % 1000 / 100 == 1;
 }
 
 inline bool secondParamIsImmediate (Number instruction) {
-    return instruction % 10000 / 1000;
+    return instruction % 10000 / 1000 == 1;
 }
 
+inline bool firstParamIsRelative (Number instruction) {
+    return instruction % 100 / 100 == 2;
+}
+
+inline bool secondParamIsRelative (Number instruction) {
+    return instruction % 10000 / 1000 == 2;
+}
+*/
+
+inline ParamMode extractParamMode (Number instruction, int param) {
+    int value;
+    switch (param) {
+        case 1: value = instruction % 1000 / 100; break;
+        case 2: value = instruction % 10000 / 1000; break;
+        case 3: value = instruction % 100000 / 10000; break;
+        default: throw std::runtime_error ("Unknown parameter index " + std::to_string (param));
+    }
+    switch (value) {
+        case 0: return ABSOLUTE;
+        case 1: return IMMEDIATE;
+        case 2: return RELATIVE;
+        default: throw std::runtime_error ("Unknown parameter type " + std::to_string (value));
+    }
+}
+
+/*
 constexpr Number FIRST_PARAM_POSITION = 0;
 constexpr Number FIRST_PARAM_IMMEDIATE = 100;
 constexpr Number SECOND_PARAM_POSITION = 0;
 constexpr Number SECOND_PARAM_IMMEDIATE = 1000;
-
+*/
 
 constexpr Number OPCODE_ADD = 1;
 constexpr Number OPCODE_MULT = 2;
@@ -38,6 +67,7 @@ constexpr Number OPCODE_JTRUE = 5;
 constexpr Number OPCODE_JFALSE = 6;
 constexpr Number OPCODE_LT = 7;
 constexpr Number OPCODE_EQ = 8;
+constexpr Number OPCODE_RELBASE = 9;
 constexpr Number OPCODE_HALT = 99;
 
 
@@ -54,6 +84,7 @@ inline unsigned int valuesInInstruction (Number opcode) {
             return 3U;
         case OPCODE_INPUT:
         case OPCODE_OUTPUT:
+        case OPCODE_RELBASE:
             return 2U;
         case OPCODE_HALT:
             return 1U;
@@ -73,7 +104,8 @@ inline bool isValidOpcode (Number num) {
         num == OPCODE_JTRUE ||
         num == OPCODE_JFALSE ||
         num == OPCODE_LT ||
-        num == OPCODE_EQ;
+        num == OPCODE_EQ ||
+        num == OPCODE_RELBASE;
 }
 
 
@@ -119,8 +151,7 @@ public:
 
     std::string toString () const;
 private:
-    Number readFirstOperand (Number instruction) const;
-    Number readSecondOperand (Number instruction) const;
+    Number readParameter (Number instruction, unsigned int index) const;
     Number readMemoryAddress (Number address) const;
     void writeMemoryAddress (Number address, Number value);
 
@@ -130,13 +161,14 @@ private:
     NumbersList m_inputs;
     unsigned int m_inputPointer;
     NumbersList m_outputs;
+    Number m_relativeBase;
 };
 
 
 
 
 ICComputer::ICComputer ()
-: m_memory {}, m_instPointer {0U}, m_terminated {true}, m_inputs {}, m_inputPointer {0U}, m_outputs {} {
+: m_memory {}, m_instPointer {0U}, m_terminated {true}, m_inputs {}, m_inputPointer {0U}, m_outputs {}, m_relativeBase {0U} {
 }
 
 ICComputer::ICComputer (NumbersList const& prog, NumbersList const& inputs)
@@ -157,18 +189,28 @@ void ICComputer::loadProgram (NumbersList const& prog, NumbersList const& inputs
     m_inputs = inputs;
     m_outputs.clear ();
     m_inputPointer = 0U;
+    m_relativeBase = 0U;
 }
 
-Number ICComputer::readFirstOperand (Number instruction) const {
-    Number firstOperand = readMemoryAddress (m_instPointer + 1);
-    if (!firstParamIsImmediate (instruction)) { firstOperand = readMemoryAddress (firstOperand); }
-    return firstOperand;
-}
-
-Number ICComputer::readSecondOperand (Number instruction) const {
-    Number secondOperand = readMemoryAddress (m_instPointer + 2);
-    if (!secondParamIsImmediate (instruction)) { secondOperand = readMemoryAddress (secondOperand); }
-    return secondOperand;
+Number ICComputer::readParameter (Number instruction, unsigned int index) const {
+    Number operand = readMemoryAddress (m_instPointer + index);
+    switch (extractParamMode (readMemoryAddress (m_instPointer), index)) {
+        case ABSOLUTE: {
+            operand = readMemoryAddress (operand);
+            break;
+        }
+        case IMMEDIATE: {
+            break;
+        }
+        case RELATIVE: {
+            operand = readMemoryAddress (m_relativeBase + operand);
+            break;
+        }
+        default: {
+            throw std::runtime_error ("Unknown parameter mode " + std::to_string (extractParamMode (readMemoryAddress (m_instPointer), index)));
+        }
+    }
+    return operand;
 }
 
 Number ICComputer::readMemoryAddress (Number address) const {
@@ -190,11 +232,11 @@ void ICComputer::executeNextInstruction () {
     if (m_terminated) { throw std::runtime_error ("Program has already halted."); }
     switch (opcode) {
         case OPCODE_ADD: {
-            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readFirstOperand (instruction) + readSecondOperand (instruction));
+            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readParameter (instruction, 1) + readParameter (instruction, 2));
             break;
         }
         case OPCODE_MULT: {
-            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readFirstOperand (instruction) * readSecondOperand (instruction));
+            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readParameter (instruction, 1) * readParameter (instruction, 2));
             break;
         }
         case OPCODE_INPUT: {
@@ -203,29 +245,33 @@ void ICComputer::executeNextInstruction () {
             break;
         }
         case OPCODE_OUTPUT: {
-            m_outputs.push_back (readFirstOperand (instruction));
+            m_outputs.push_back (readParameter (instruction, 1));
             break;
         }
         case OPCODE_JTRUE: {
-            if (readFirstOperand (instruction) != 0) {
-                m_instPointer = readSecondOperand (instruction);
+            if (readParameter (instruction, 1) != 0) {
+                m_instPointer = readParameter (instruction, 2);
                 modifiedIP = true;
             }
             break;
         }
         case OPCODE_JFALSE: {
-            if (readFirstOperand (instruction) == 0) {
-                m_instPointer = readSecondOperand (instruction);
+            if (readParameter (instruction, 1) == 0) {
+                m_instPointer = readParameter (instruction, 2);
                 modifiedIP = true;
             }
             break;
         }
         case OPCODE_LT: {
-            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readFirstOperand (instruction) < readSecondOperand (instruction));
+            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readParameter (instruction, 1) < readParameter (instruction, 2));
             break;
         }
         case OPCODE_EQ: {
-            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readFirstOperand (instruction) == readSecondOperand (instruction));
+            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readParameter (instruction, 1) == readParameter (instruction, 2));
+            break;
+        }
+        case OPCODE_RELBASE: {
+            m_relativeBase += readParameter (instruction, 1);
             break;
         }
         case OPCODE_HALT: {
