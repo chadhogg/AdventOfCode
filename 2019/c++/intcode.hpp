@@ -10,7 +10,7 @@
 #include <iostream>
 #include <sstream>
 
-using Number = int;
+using Number = long;
 
 inline Number extractOpcode (Number instruction) {
     return instruction % 100;
@@ -87,11 +87,11 @@ NumbersList parseNumbersList (std::string const& str) {
         std::size_t curr = str.find (',', prev + 1U);
         while (curr != std::string::npos) {
             std::string part = str.substr (prev, curr - prev);
-            prog.push_back (std::stoi (part));
+            prog.push_back (std::stol (part));
             prev = curr + 1U;
             curr = str.find (',', prev);
         }
-        prog.push_back (std::stoi (str.substr (prev)));
+        prog.push_back (std::stol (str.substr (prev)));
     }
     return prog;
 }
@@ -114,13 +114,15 @@ public:
 
     inline bool isTerminated () const { return m_terminated; }
     inline unsigned int getInstPointer () const { return m_instPointer; }
-    inline int getNumber (unsigned int pos) const { return m_memory.at (pos); }
+    inline int getNumber (unsigned int pos) const { return readMemoryAddress (pos); }
     inline NumbersList getOutputs () const { return m_outputs; }
 
     std::string toString () const;
 private:
-    int readFirstOperand (Number instruction) const;
-    int readSecondOperand (Number instruction) const;
+    Number readFirstOperand (Number instruction) const;
+    Number readSecondOperand (Number instruction) const;
+    Number readMemoryAddress (Number address) const;
+    void writeMemoryAddress (Number address, Number value);
 
     NumbersList m_memory;
     unsigned int m_instPointer;
@@ -157,16 +159,26 @@ void ICComputer::loadProgram (NumbersList const& prog, NumbersList const& inputs
     m_inputPointer = 0U;
 }
 
-int ICComputer::readFirstOperand (Number instruction) const {
-    Number firstOperand = m_memory.at (m_instPointer + 1);
-    if (!firstParamIsImmediate (instruction)) { firstOperand = m_memory.at (firstOperand); }
+Number ICComputer::readFirstOperand (Number instruction) const {
+    Number firstOperand = readMemoryAddress (m_instPointer + 1);
+    if (!firstParamIsImmediate (instruction)) { firstOperand = readMemoryAddress (firstOperand); }
     return firstOperand;
 }
 
-int ICComputer::readSecondOperand (Number instruction) const {
-    Number secondOperand = m_memory.at (m_instPointer + 2);
-    if (!secondParamIsImmediate (instruction)) { secondOperand = m_memory.at (secondOperand); }
+Number ICComputer::readSecondOperand (Number instruction) const {
+    Number secondOperand = readMemoryAddress (m_instPointer + 2);
+    if (!secondParamIsImmediate (instruction)) { secondOperand = readMemoryAddress (secondOperand); }
     return secondOperand;
+}
+
+Number ICComputer::readMemoryAddress (Number address) const {
+    if ((unsigned Number)address < m_memory.size ()) { return m_memory.at (address); }
+    else { return 0; }
+}
+
+void ICComputer::writeMemoryAddress (Number address, Number value) {
+    while (m_memory.size () <= (unsigned Number)address) { m_memory.push_back (0); }
+    m_memory[address] = value;
 }
 
 
@@ -178,15 +190,15 @@ void ICComputer::executeNextInstruction () {
     if (m_terminated) { throw std::runtime_error ("Program has already halted."); }
     switch (opcode) {
         case OPCODE_ADD: {
-            m_memory[m_memory.at (m_instPointer + 3)] = readFirstOperand (instruction) + readSecondOperand (instruction);
+            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readFirstOperand (instruction) + readSecondOperand (instruction));
             break;
         }
         case OPCODE_MULT: {
-            m_memory[m_memory.at (m_instPointer + 3)] = readFirstOperand (instruction) * readSecondOperand (instruction);
+            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readFirstOperand (instruction) * readSecondOperand (instruction));
             break;
         }
         case OPCODE_INPUT: {
-            m_memory[m_memory.at (m_instPointer + 1)] = m_inputs.at (m_inputPointer);
+            writeMemoryAddress (readMemoryAddress (m_instPointer + 1), m_inputs.at (m_inputPointer));
             ++m_inputPointer;
             break;
         }
@@ -209,11 +221,11 @@ void ICComputer::executeNextInstruction () {
             break;
         }
         case OPCODE_LT: {
-            m_memory[m_memory.at (m_instPointer + 3)] = (readFirstOperand (instruction) < readSecondOperand (instruction));
+            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readFirstOperand (instruction) < readSecondOperand (instruction));
             break;
         }
         case OPCODE_EQ: {
-            m_memory[m_memory.at (m_instPointer + 3)] = (readFirstOperand (instruction) == readSecondOperand (instruction));
+            writeMemoryAddress (readMemoryAddress (m_instPointer + 3), readFirstOperand (instruction) == readSecondOperand (instruction));
             break;
         }
         case OPCODE_HALT: {
