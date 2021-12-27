@@ -12,29 +12,31 @@
 
 using Number = long;
 
-enum ParamMode {ABSOLUTE = 0, IMMEDIATE = 1, RELATIVE = 2};
+enum ParamMode {
+    ABSOLUTE = 0, 
+    IMMEDIATE = 1, 
+    RELATIVE = 2
+};
+
+enum Opcode {
+    OPCODE_ADD = 1,
+    OPCODE_MULT = 2,
+    OPCODE_INPUT = 3,
+    OPCODE_OUTPUT = 4,
+    OPCODE_JTRUE = 5,
+    OPCODE_JFALSE = 6,
+    OPCODE_LT = 7,
+    OPCODE_EQ = 8,
+    OPCODE_RELBASE = 9,
+    OPCODE_HALT = 99
+};
+
+
 
 inline Number extractOpcode (Number instruction) {
     return instruction % 100;
 }
 
-/*
-inline bool firstParamIsImmediate (Number instruction) {
-    return instruction % 1000 / 100 == 1;
-}
-
-inline bool secondParamIsImmediate (Number instruction) {
-    return instruction % 10000 / 1000 == 1;
-}
-
-inline bool firstParamIsRelative (Number instruction) {
-    return instruction % 100 / 100 == 2;
-}
-
-inline bool secondParamIsRelative (Number instruction) {
-    return instruction % 10000 / 1000 == 2;
-}
-*/
 
 inline ParamMode extractParamMode (Number instruction, int param) {
     int value;
@@ -51,25 +53,6 @@ inline ParamMode extractParamMode (Number instruction, int param) {
         default: throw std::runtime_error ("Unknown parameter type " + std::to_string (value));
     }
 }
-
-/*
-constexpr Number FIRST_PARAM_POSITION = 0;
-constexpr Number FIRST_PARAM_IMMEDIATE = 100;
-constexpr Number SECOND_PARAM_POSITION = 0;
-constexpr Number SECOND_PARAM_IMMEDIATE = 1000;
-*/
-
-constexpr Number OPCODE_ADD = 1;
-constexpr Number OPCODE_MULT = 2;
-constexpr Number OPCODE_INPUT = 3;
-constexpr Number OPCODE_OUTPUT = 4;
-constexpr Number OPCODE_JTRUE = 5;
-constexpr Number OPCODE_JFALSE = 6;
-constexpr Number OPCODE_LT = 7;
-constexpr Number OPCODE_EQ = 8;
-constexpr Number OPCODE_RELBASE = 9;
-constexpr Number OPCODE_HALT = 99;
-
 
 
 inline unsigned int valuesInInstruction (Number opcode) {
