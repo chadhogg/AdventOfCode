@@ -27,19 +27,89 @@ enum Status {
     GOAL = 2
 };
 
+std::vector<Coordinate> getNeighbors (Coordinate c) {
+    return { {c.row - 1, c.col}, {c.row + 1, c.col}, {c.row, c.col - 1}, {c.row, c.col + 1} };
+}
+
+struct Map {
+    std::unordered_set<Coordinate> visited;
+    std::unordered_set<Coordinate> walls;
+    std::unordered_set<Coordinate> goals;
+    std::unordered_set<Coordinate> oxygen;
+    std::unordered_set<Coordinate> explorable;
+    Coordinate drone;
+    Coordinate upperLeft;
+    Coordinate lowerRight;
+
+    Map () : Map ({0, 0}) {}
+    Map (Coordinate const& initialDrone) {
+        initialize (initialDrone);
+    }
+
+    void draw () const;
+    void initialize (Coordinate initialDrone);
+    void recordWallHit (Coordinate where);
+    void recordMove (Coordinate where);
+};
+
 using Path = std::vector<Command>;
 
-void drawPicture (std::unordered_set<Coordinate> const& visited, std::unordered_set<Coordinate> const& walls, Coordinate const& current, Coordinate const& upperLeft, Coordinate const& lowerRight) {
+void Map::draw () const{
+    for (int i = 0; i < 50; ++i) {
+        std::cout << "\n";
+    }
     for (int row {upperLeft.row}; row <= lowerRight.row; ++row) {
         for (int col {upperLeft.col}; col <= lowerRight.col; ++col) {
             Coordinate here {row, col};
-            if (row == current.row && col == current.col) { std::cout << "D"; }
-            else if (visited.find (here) != visited.end ()) { std::cout << "."; }
-            else if (walls.find (here) != walls.end ()) { std::cout << "#"; }
+            if (here == drone) { std::cout << "D"; }
+            else if (oxygen.count (here) == 1) { std::cout << "o"; }
+            else if (goals.count (here) == 1) { std::cout << "g"; }
+            else if (visited.count (here) == 1) { std::cout << "."; }
+            else if (walls.count (here) == 1) { std::cout << "#"; }
             else { std::cout << " "; }
         }
         std::cout << "\n";
     }
+    std::cout << "\n";
+}
+
+void Map::initialize (Coordinate initialDrone) {
+    visited.clear ();
+    walls.clear ();
+    goals.clear ();
+    oxygen.clear ();
+    explorable.clear ();
+    drone = initialDrone;
+    upperLeft = {drone.row - 1, drone.col - 1};
+    lowerRight = {drone.row + 1, drone.col + 1};
+    visited.insert (drone);
+    for (Coordinate const& c : getNeighbors (drone)) {
+        explorable.insert (c);
+    }
+}
+
+void Map::recordWallHit (Coordinate where) {
+    walls.insert (where);
+    explorable.erase (where);
+    upperLeft.row = std::min (upperLeft.row, where.row);
+    upperLeft.col = std::min (upperLeft.col, where.col);
+    lowerRight.row = std::max (lowerRight.row, where.row);
+    lowerRight.col = std::max (lowerRight.col, where.col);
+}
+
+void Map::recordMove (Coordinate where) {
+    drone = where;
+    visited.insert (drone);
+    explorable.erase (drone);
+    for (Coordinate const& c : getNeighbors (drone)) {
+        if (visited.count (c) == 0 && walls.count (c) == 0) {
+            explorable.insert (c);
+        }
+    }
+    upperLeft.row = std::min (upperLeft.row, where.row);
+    upperLeft.col = std::min (upperLeft.col, where.col);
+    lowerRight.row = std::max (lowerRight.row, where.row);
+    lowerRight.col = std::max (lowerRight.col, where.col);
 }
 
 Coordinate findClosest (std::unordered_map<Coordinate, Path> const& map) {
@@ -52,13 +122,12 @@ Coordinate findClosest (std::unordered_map<Coordinate, Path> const& map) {
     return chosen;
 }
 
-std::unordered_map<Coordinate, Path> shortestPaths (Coordinate start, std::unordered_set<Coordinate> const& goals, std::unordered_set<Coordinate> const& known) {
-    std::unordered_map<Coordinate, Path> result;
+std::pair<Coordinate, Path> pathToClosestGoal (Coordinate start, std::unordered_set<Coordinate> const& goals, std::unordered_set<Coordinate> const& known) {
     std::unordered_map<Coordinate, Path> finished;
     std::unordered_map<Coordinate, Path> visited;
     std::unordered_set<Coordinate> unvisited;
     visited.insert ({start, {}});
-    while (result.size () < goals.size ()) {
+    while (true) {
         assert (!visited.empty ());
         Coordinate current = findClosest (visited);
         Path soFar = visited.at (current);
@@ -87,24 +156,16 @@ std::unordered_map<Coordinate, Path> shortestPaths (Coordinate start, std::unord
         }
         finished[current] = soFar;
         if (goals.count (current) == 1) {
-            result[current] = soFar;
+            return {current, soFar};
         }
     }
-    return result;
 }
 
-
-Coordinate exploreManually (NumbersList & prog) {
-    Coordinate current {0, 0};
-    Coordinate upperLeft {0, 0};
-    Coordinate lowerRight {0, 0};
-    std::unordered_set<Coordinate> visited;
-    visited.insert (current);
-    std::unordered_set<Coordinate> walls;
+void exploreManually (NumbersList & prog, Map & map) {
     ICComputer comp;
     comp.loadProgram (prog, {});
-    while (true) {
-        drawPicture (visited, walls, current, upperLeft, lowerRight);
+    while (!map.explorable.empty ()) {
+        map.draw ();
         std::string human;
         while (human != "w" && human != "a" && human != "s" && human != "d") {
             human = read<std::string> ();
@@ -117,235 +178,90 @@ Coordinate exploreManually (NumbersList & prog) {
             case 'd': input = EAST; break;
         }
         comp.addInput (input);
+        Coordinate whereTo = map.drone;
+        switch (input) {
+            case NORTH: --whereTo.row; break;
+            case SOUTH: ++whereTo.row; break;
+            case WEST: --whereTo.col; break;
+            case EAST: ++whereTo.col; break;
+        }
         comp.executeUntilMissingInput ();
         Number output = comp.getOutputs ().back ();
         if (output == HIT_WALL) {
-            switch (input) {
-                case NORTH: walls.insert ({current.row - 1, current.col}); break;
-                case SOUTH: walls.insert ({current.row + 1, current.col}); break;
-                case WEST: walls.insert ({current.row, current.col - 1}); break;
-                case EAST: walls.insert ({current.row, current.col + 1}); break;
-            }
+            map.recordWallHit (whereTo);
         }
         else {
-            switch (input) {
-                case NORTH: --current.row; break;
-                case SOUTH: ++current.row; break;
-                case WEST: --current.col; break;
-                case EAST: ++current.col; break;
-            }
-            visited.insert (current);
-            if (output == GOAL) { return current; }
-        }
-        switch (input) {
-            case NORTH: upperLeft.row = std::min (upperLeft.row, current.row - 1); break;
-            case SOUTH: lowerRight.row = std::max (lowerRight.row, current.row + 1); break;
-            case WEST: upperLeft.col = std::min (upperLeft.col, current.col - 1); break;
-            case EAST: lowerRight.col = std::max (lowerRight.col, current.col + 1); break;
+            map.recordMove (whereTo);
+            if (output == GOAL) { map.goals.insert (map.drone); }
         }
     }
 }
 
-unsigned int exploreAutomatically (NumbersList & prog) {
-    Coordinate current {0, 0};
-    Coordinate upperLeft {0, 0};
-    Coordinate lowerRight {0, 0};
-    std::unordered_set<Coordinate> visited;
-    std::unordered_set<Coordinate> frontier;
-    visited.insert (current);
-    frontier.insert ({current.row - 1, current.col});
-    frontier.insert ({current.row + 1, current.col});
-    frontier.insert ({current.row, current.col - 1});
-    frontier.insert ({current.row, current.col + 1});
-    std::unordered_set<Coordinate> walls;
-    std::unordered_set<Coordinate> goals;
+void exploreAutomatically (NumbersList & prog, Map & map) {
     ICComputer comp;
     comp.loadProgram (prog, {});
-    std::unordered_map<Coordinate, Path> paths = shortestPaths (current, frontier, visited);
-    Coordinate goal = findClosest (paths);
-    Path path = paths[goal];
-    while (!frontier.empty ()) {
-        drawPicture (visited, walls, current, upperLeft, lowerRight);
-        if (path.empty ()) {
-            paths = shortestPaths (current, frontier, visited);
-            goal = findClosest (paths);
-            path = paths[goal];
+    std::pair<Coordinate, Path> currentGoal = pathToClosestGoal (map.drone, map.explorable, map.visited);
+    while (!map.explorable.empty ()) {
+        map.draw ();
+        if (currentGoal.second.empty ()) {
+            currentGoal = pathToClosestGoal (map.drone, map.explorable, map.visited);
         }
-        int input = path[0];
-        path.erase (path.begin ());
+        int input = currentGoal.second[0];
+        currentGoal.second.erase (currentGoal.second.begin ());
         comp.addInput (input);
+        Coordinate whereTo = map.drone;
+        switch (input) {
+            case NORTH: --whereTo.row; break;
+            case SOUTH: ++whereTo.row; break;
+            case WEST: --whereTo.col; break;
+            case EAST: ++whereTo.col; break;
+        }
         comp.executeUntilMissingInput ();
         Number output = comp.getOutputs ().back ();
         if (output == HIT_WALL) {
-            switch (input) {
-                case NORTH: {
-                    walls.insert ({current.row - 1, current.col});
-                    frontier.erase ({current.row - 1, current.col});
-                    break;
-                }
-                case SOUTH: {
-                    walls.insert ({current.row + 1, current.col});
-                    frontier.erase ({current.row + 1, current.col});
-                    break;
-                }
-                case WEST: {
-                    walls.insert ({current.row, current.col - 1});
-                    frontier.erase ({current.row, current.col - 1});
-                    break;
-                }
-                case EAST: {
-                    walls.insert ({current.row, current.col + 1});
-                    frontier.erase ({current.row, current.col + 1});
-                    break;
-                }
-            }
+            map.recordWallHit (whereTo);
         }
         else {
-            switch (input) {
-                case NORTH: { --current.row; break; }
-                case SOUTH: { ++current.row; break; }
-                case WEST: { --current.col; break; }
-                case EAST: { ++current.col; break; }
-            }
-            visited.insert (current);
-            frontier.erase (current);
-            std::vector<Coordinate> neighbors { {current.row - 1, current.col}, {current.row + 1, current.col}, {current.row, current.col - 1}, {current.row, current.col + 1} };
-            for (Coordinate const& neighbor : neighbors) {
-                if (walls.count (neighbor) == 0 && visited.count (neighbor) == 0) {
-                    frontier.insert (neighbor);
-                }
-            }
-            if (output == GOAL) { goals.insert (current); }
+            map.recordMove (whereTo);
+            if (output == GOAL) { map.goals.insert (map.drone); }
         }
-        switch (input) {
-            case NORTH: { upperLeft.row = std::min (upperLeft.row, current.row - 1); break; }
-            case SOUTH: { lowerRight.row = std::max (lowerRight.row, current.row + 1); break; }
-            case WEST: { upperLeft.col = std::min (upperLeft.col, current.col - 1); break; }
-            case EAST: { lowerRight.col = std::max (lowerRight.col, current.col + 1); break; }
-        }
-        std::this_thread::sleep_for (std::chrono::milliseconds (50));   
+        std::this_thread::sleep_for (std::chrono::milliseconds (5));
     }
-    paths = shortestPaths ({0, 0}, goals, visited);
-    Coordinate reached = findClosest (paths);
-    return paths.at (reached).size ();
+    map.draw ();
 }
 
-
-/*
-void drawPicture (Picture const& pic) {
-    for (unsigned int row {0U}; row < pic.size (); ++row) {
-        for (unsigned int col {0U}; col < pic.at (row).size (); ++col) {
-            if (pic[row][col] == EMPTY) { std::cout << " "; }
-            else { std::cout << pic[row][col]; }
-        }
-        std::cout << "\n";
+unsigned int fillWithOxygen (Map & map) {
+    unsigned int years {0U};
+    for (Coordinate const& c : map.goals) {
+        map.oxygen.insert (c);
     }
-}
-
-void playGame (NumbersList const& prog) {
-    ICComputer comp;
-    comp.loadProgram (prog, {});
-    comp.executeAllInstructions ();
-    Number maxCol {0}, maxRow {0};
-    NumbersList output = comp.getOutputs ();
-    assert (output.size () % 3 == 0);
-    for (unsigned int index {0U}; index < output.size (); index += 3) {
-        assert (output[index] >= 0);
-        assert (output[index + 1] >= 0);
-        maxCol = std::max (maxCol, output[index]);
-        maxRow = std::max (maxRow, output[index + 1]);
-        assert (output[index + 2] >= EMPTY && output[index + 2] <= BALL);
-    }
-    Picture pic (maxRow + 1, std::vector<int> (maxCol + 1, EMPTY));
-    for (unsigned int index {0U}; index < output.size (); index += 3) {
-        pic[output[index + 1]][output[index]] = output[index + 2];
-    }
-    drawPicture (pic);
-    unsigned int blockCount {0U};
-    for (unsigned int row {0U}; row < pic.size (); ++row) {
-        for (unsigned int col {0U}; col < pic[row].size (); ++col) {
-            if (pic[row][col] == BLOCK) { ++blockCount; }
-        }
-    }
-    std::cout << blockCount << "\n";
-}
-
-void playGame2 (NumbersList const& prog) {
-    ICComputer comp;
-    NumbersList revisedProg = prog;
-    revisedProg[0] = 2;
-    comp.loadProgram (revisedProg, {});
-    Number score {0};
-    int ballCol {0};
-    int paddleCol {0};
-    while (!comp.isTerminated ()) {
-        comp.executeUntilMissingInput ();
-        Number maxCol {0}, maxRow {0};
-        NumbersList output = comp.getOutputs ();
-        assert (output.size () % 3 == 0);
-        for (unsigned int index {0U}; index < output.size (); index += 3) {
-            if (output[index] == -1 && output[index + 1] == 0) {
-                score = output[index + 2];
-            }
-            else {
-                assert (output[index] >= 0);
-                assert (output[index + 1] >= 0);
-                maxCol = std::max (maxCol, output[index]);
-                maxRow = std::max (maxRow, output[index + 1]);
-                assert (output[index + 2] >= EMPTY && output[index + 2] <= BALL);
-            }
-        }
-        Picture pic;
-        for (int row {0}; row <= maxRow; ++row) {
-            pic.push_back ({});
-            for (int col {0}; col <= maxCol; ++col) {
-                pic.back ().push_back (EMPTY);
-            }
-        }
-        for (unsigned int index {0U}; index < output.size (); index += 3) {
-            if (output[index] == -1 && output[index + 1] == 0) {
-                score = output[index + 2];
-            }
-            else {
-                pic[output[index + 1]][output[index]] = output[index + 2];
-                if (output[index + 2] == BALL) {
-                    ballCol = output[index];
-                }
-                else if (output[index + 2] == PADDLE) {
-                    paddleCol = output[index];
+    while (map.oxygen.size () < map.visited.size ()) {
+        map.draw ();
+        std::unordered_set<Coordinate> newOxygen;
+        for (Coordinate const& c : map.oxygen) {
+            newOxygen.insert (c);
+            for (Coordinate const& n : getNeighbors (c)) {
+                if (map.visited.count (n) == 1) {
+                    newOxygen.insert (n);
                 }
             }
         }
-        drawPicture (pic);
-        std::cout << score << "\n";
-        
-        //std::string action;
-        //do {
-        //    action = read<std::string> ();
-        //} while (action != "q" && action != "w" && action != "e");
-        //switch (action[0]) {
-        //    case 'q': comp.addInput (-1); break;
-        //    case 'w': comp.addInput (0); break;
-        //    case 'e': comp.addInput (1); break;
-        //}
-        
-        if (paddleCol < ballCol) { comp.addInput (1); }
-        else if (paddleCol > ballCol) { comp.addInput (-1); }
-        else { comp.addInput (0); }
-        std::this_thread::sleep_for (std::chrono::milliseconds (50));   
+        map.oxygen = newOxygen;
+        ++years;
+        std::this_thread::sleep_for (std::chrono::milliseconds (5));
     }
-
+    map.draw ();
+    return years;
 }
-*/
-
 
 int main () {
     std::ifstream fin ("../inputs/Day15.my.input");
     NumbersList prog = parseNumbersList (read<std::string> (fin));
     fin.close ();
-    //exploreManually (prog);
-    //playGame (prog);
-    //playGame2 (prog);
-    std::cout << exploreAutomatically (prog) << "\n";
+    Map map;
+    exploreAutomatically (prog, map);
+    unsigned int minutes = fillWithOxygen (map);
+    std::cout << pathToClosestGoal ({0, 0}, map.goals, map.visited).second.size () << "\n";
+    std::cout << minutes << "\n";
     return 0;
 }
