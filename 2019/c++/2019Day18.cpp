@@ -12,6 +12,8 @@
 #include <unordered_set>
 #include <climits>
 #include <deque>
+#include <array>
+#include <cctype>
 
 #include "utilities.hpp"
 
@@ -19,6 +21,45 @@ constexpr char PLAYER = '@';
 constexpr char WALL = '#';
 constexpr char PASSAGE = '.';
 constexpr char OFF_MAP = '?';
+
+constexpr std::size_t MAX_KEYS = 26U;
+
+class KeySet {
+public:
+    KeySet () : set {}, count {0U} {}
+    inline void addKey (char key) { set[key - 'a'] = true; ++count; }
+    inline bool hasKey (char key) const { return set[key - 'a']; }
+    inline std::size_t size () const { return count; }
+    bool containsAll (KeySet const& other) const {
+        for (std::size_t index {0U}; index < MAX_KEYS; ++index) {
+            if (other.set[index] && !set[index]) { return false; }
+        }
+        return true;
+    }
+    inline bool operator== (KeySet const& other) const { 
+        //std::cout << "Me: " << set << " (" << count << ")\n";
+        //std::cout << "It: " << other.set << " (" << other.count << ")\n";
+        bool result = (count == other.count && set == other.set);
+        //std::cout << "Returning " << result << "\n";
+        return result;
+    }
+    friend std::ostream & operator<< (std::ostream & out, KeySet const& keys) {
+        for (std::size_t index {0U}; index < MAX_KEYS; ++index) {
+            if (keys.set[index]) { out << (index + 'a'); }
+            else { out << ' '; }
+        }
+        return out;
+    }
+private:
+    std::array<bool, MAX_KEYS> set;
+    std::size_t count;
+};
+
+inline char isKey (char c) { /*return std::islower (c);*/ return c >= 'a' && c <= 'z'; }
+//inline char isDoor (char c) { return std::isupper (c); }
+inline char isDoor (char c) { return c >= 'A' && c <= 'Z'; }
+inline char doorToKey (char c) { /*return std::tolower (c);*/ return c + ('a' - 'A'); }
+inline char keyToDoor (char c) { /*return std::toupper (c);*/ return c - ('a' - 'A'); }
 
 struct Board {
     std::vector<std::vector<char>> picture;
@@ -29,7 +70,7 @@ struct Board {
 
 struct GameState {
     const Board * const board;
-    std::set<char> foundKeys;
+    KeySet foundKeys;
     std::vector<Coordinate> playerLocs;
     unsigned int movedSoFar;
 
@@ -60,12 +101,12 @@ struct GameState {
                 if (c == where) { return PLAYER; }
             }
             for (std::pair<const char, Coordinate> const& key : board->keyLocations) {
-                if (key.second == where && foundKeys.count (key.first) == 0) {
+                if (key.second == where && !foundKeys.hasKey (key.first)) {
                     return key.first;
                 }
             }
             for (std::pair<const char, Coordinate> const& door : board->doorLocations) {
-                if (door.second == where && foundKeys.count (std::tolower (door.first)) == 0) {
+                if (door.second == where && !foundKeys.hasKey (doorToKey (door.first))) {
                     return door.first;
                 }
             }
@@ -81,12 +122,8 @@ std::ostream& operator<< (std::ostream & out, GameState const& state) {
         }
         out << "\n";
     }
-    out << "Found keys: ";
-    for (char key {'a'}; key <= 'z'; ++key) {
-        if (state.foundKeys.count (key) == 1) { out << key; }
-        else { out << " "; }
-    }
-    out << "\nMoves so far: " << state.movedSoFar << "\n";
+    out << "Found keys: " << state.foundKeys << "\n";
+    out << "Moves so far: " << state.movedSoFar << "\n";
     return out;
 }
 
@@ -126,14 +163,6 @@ std::vector<Coordinate> getNeighbors (Coordinate c) {
     return { {c.row - 1, c.col}, {c.row + 1, c.col}, {c.row, c.col - 1}, {c.row, c.col + 1} };
 }
 
-template<typename T>
-bool isSubset (std::set<T> const& whole, std::set<T> const& part) {
-    for (T const& obj : part) {
-        if (whole.count (obj) == 0) { return false; }
-    }
-    return true;
-}
-
 Coordinate findClosest (std::unordered_map<Coordinate, unsigned int> const& map) {
     Coordinate chosen = map.begin ()->first;
     for (std::pair<Coordinate const, unsigned int> const& pair : map) {
@@ -145,12 +174,12 @@ Coordinate findClosest (std::unordered_map<Coordinate, unsigned int> const& map)
 }
 
 std::vector<std::pair<Coordinate, unsigned int>> getReachableKeys (GameState const& state, unsigned int playerIndex) {
-    static std::unordered_map<Coordinate, std::vector<std::pair<Coordinate, std::pair<std::set<char>, unsigned int>>>> cache;
+    static std::unordered_map<Coordinate, std::vector<std::pair<Coordinate, std::pair<KeySet, unsigned int>>>> cache;
     if (cache.count (state.playerLocs[playerIndex]) == 0) {
         cache[state.playerLocs[playerIndex]] = {};
         std::unordered_map<Coordinate, unsigned int> finished;
         std::unordered_map<Coordinate, unsigned int> unfinished;
-        std::unordered_map<Coordinate, std::set<char>> keysNeeded;
+        std::unordered_map<Coordinate, KeySet> keysNeeded;
         unfinished.insert ({state.playerLocs[playerIndex], 0U});
         keysNeeded.insert ({state.playerLocs[playerIndex], {}});
         while (!unfinished.empty ()) {
@@ -165,7 +194,7 @@ std::vector<std::pair<Coordinate, unsigned int>> getReachableKeys (GameState con
                         if (unfinished.count (neighbor) == 0 || unfinished[neighbor] > currentDist + 1) {
                             unfinished[neighbor] = currentDist + 1;
                             keysNeeded[neighbor] = keysNeeded[currentLoc];
-                            if (std::isupper (symbol)) { keysNeeded[neighbor].insert (std::tolower (symbol)); }
+                            if (isDoor (symbol)) { keysNeeded[neighbor].addKey (doorToKey (symbol)); }
                         }
                     }
                 }
@@ -177,9 +206,9 @@ std::vector<std::pair<Coordinate, unsigned int>> getReachableKeys (GameState con
         }
     }
     std::vector<std::pair<Coordinate, unsigned int>> result;
-    for (std::pair<Coordinate, std::pair<std::set<char>, unsigned int>> const& pair : cache[state.playerLocs[playerIndex]]) {
-        if (state.foundKeys.count (state.getUnderlyingSymbol (pair.first)) == 0) {
-            if (isSubset (state.foundKeys, pair.second.first)) {
+    for (std::pair<Coordinate, std::pair<KeySet, unsigned int>> const& pair : cache[state.playerLocs[playerIndex]]) {
+        if (!state.foundKeys.hasKey (state.getUnderlyingSymbol (pair.first))) {
+            if (state.foundKeys.containsAll (pair.second.first)) {
                 result.push_back ({pair.first, pair.second.second});
             }
         }
@@ -223,7 +252,7 @@ unsigned int findAllKeysBF (Board const& board) {
                     GameState * successor = new GameState (*state);
                     successor->playerLocs[playerIndex] = move.first;
                     successor->movedSoFar += move.second;
-                    successor->foundKeys.insert (successor->getUnderlyingSymbol (move.first));
+                    successor->foundKeys.addKey (successor->getUnderlyingSymbol (move.first));
                     bool found = false;
                     for (GameState* existing : frontier) {
                         if (/*existing->playerLocs[0] == successor->playerLocs[0]*/ same (existing->playerLocs, successor->playerLocs) /*existing->playerLocs == successor->playerLocs*/ && existing->foundKeys == successor->foundKeys) {
@@ -260,6 +289,7 @@ Board divideMap (Board const& original) {
 }
 
 int main () {
+    assert (isDoor ('B'));
     Board original = getInput ();
     //std::cout << initial << "\n";
     //std::cout << findAllKeysBF (initial) << "\n";
