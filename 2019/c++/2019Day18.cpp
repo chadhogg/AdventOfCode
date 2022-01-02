@@ -19,61 +19,64 @@ constexpr char PLAYER = '@';
 constexpr char WALL = '#';
 constexpr char PASSAGE = '.';
 constexpr char OFF_MAP = '?';
-constexpr char PLAYER2 = '2';
-constexpr char PLAYER3 = '3';
-constexpr char PLAYER4 = '4';
 
-
-struct GameState {
+struct Board {
     std::vector<std::vector<char>> picture;
     std::map<char, Coordinate> keyLocations;
     std::map<char, Coordinate> doorLocations;
+    std::vector<Coordinate> initialPlayerLocs;
+};
+
+struct GameState {
+    const Board * const board;
     std::set<char> foundKeys;
     std::vector<Coordinate> playerLocs;
     unsigned int movedSoFar;
 
+    GameState (const Board * const b) : board {b}, foundKeys {}, playerLocs {b->initialPlayerLocs}, movedSoFar {0U} {}
+
     char getUnderlyingSymbol (Coordinate const& where) const {
-        if (where.row < 0 || where.col < 0 || where.row >= (int)picture.size () || where.col >= (int)picture[where.row].size ()) { return OFF_MAP; }
+        if (where.row < 0 || where.col < 0 || where.row >= (int)board->picture.size () || where.col >= (int)board->picture[where.row].size ()) { return OFF_MAP; }
         else {
-            for (std::pair<char, Coordinate> key : keyLocations) {
+            for (std::pair<const char, Coordinate> const& key : board->keyLocations) {
                 if (key.second == where) {
                     return key.first;
                 }
             }
-            for (std::pair<char, Coordinate> door : doorLocations) {
+            for (std::pair<const char, Coordinate> const& door : board->doorLocations) {
                 if (door.second == where) {
                     return door.first;
                 }
             }
-            return picture[where.row][where.col];
+            return board->picture[where.row][where.col];
         }
 
     }
 
     char getSymbol (Coordinate const& where) const {
-        if (where.row < 0 || where.col < 0 || where.row >= (int)picture.size () || where.col >= (int)picture[where.row].size ()) { return OFF_MAP; }
+        if (where.row < 0 || where.col < 0 || where.row >= (int)board->picture.size () || where.col >= (int)board->picture[where.row].size ()) { return OFF_MAP; }
         else {
             for (Coordinate const& c : playerLocs) {
                 if (c == where) { return PLAYER; }
             }
-            for (std::pair<char, Coordinate> key : keyLocations) {
+            for (std::pair<const char, Coordinate> const& key : board->keyLocations) {
                 if (key.second == where && foundKeys.count (key.first) == 0) {
                     return key.first;
                 }
             }
-            for (std::pair<char, Coordinate> door : doorLocations) {
+            for (std::pair<const char, Coordinate> const& door : board->doorLocations) {
                 if (door.second == where && foundKeys.count (std::tolower (door.first)) == 0) {
                     return door.first;
                 }
             }
-            return picture[where.row][where.col];
+            return board->picture[where.row][where.col];
         }
     }
 };
 
 std::ostream& operator<< (std::ostream & out, GameState const& state) {
-    for (unsigned int row {0U}; row < state.picture.size (); ++row) {
-        for (unsigned int col {0U}; col < state.picture[row].size (); ++col) {
+    for (unsigned int row {0U}; row < state.board->picture.size (); ++row) {
+        for (unsigned int col {0U}; col < state.board->picture[row].size (); ++col) {
             out << state.getSymbol ({(int)row, (int)col});
         }
         out << "\n";
@@ -87,37 +90,36 @@ std::ostream& operator<< (std::ostream & out, GameState const& state) {
     return out;
 }
 
-GameState getInput () {
-    GameState state;
+Board getInput () {
+    Board originalBoard;
     std::string line;
     int row {0};
     while (std::cin >> line) {
-        state.picture.push_back ({});
+        originalBoard.picture.push_back ({});
         for (int col {0}; col < (int)line.size (); ++col) {
             char symbol = line[col];
             assert (symbol == PASSAGE || symbol == WALL || symbol == PLAYER || std::islower (symbol) || std::isupper (symbol));
             if (std::islower (symbol)) {
-                assert (state.keyLocations.count (symbol) == 0);
-                state.keyLocations[symbol] = {row, col};
-                state.picture.back ().push_back (PASSAGE);
+                assert (originalBoard.keyLocations.count (symbol) == 0);
+                originalBoard.keyLocations[symbol] = {row, col};
+                originalBoard.picture.back ().push_back (PASSAGE);
             }
             else if (std::isupper (symbol)) {
-                assert (state.doorLocations.count (symbol) == 0);
-                state.doorLocations[symbol] = {row, col};
-                state.picture.back ().push_back (PASSAGE);
+                assert (originalBoard.doorLocations.count (symbol) == 0);
+                originalBoard.doorLocations[symbol] = {row, col};
+                originalBoard.picture.back ().push_back (PASSAGE);
             }
             else if (symbol == PLAYER) {
-                state.playerLocs.push_back ({row, col});
-                state.picture.back ().push_back (PASSAGE);
+                originalBoard.initialPlayerLocs.push_back ({row, col});
+                originalBoard.picture.back ().push_back (PASSAGE);
             }
             else {
-                state.picture.back ().push_back (symbol);
+                originalBoard.picture.back ().push_back (symbol);
             }
         }
         ++row;
     }
-    state.movedSoFar = {0U};
-    return state;
+    return originalBoard;
 }
 
 std::vector<Coordinate> getNeighbors (Coordinate c) {
@@ -194,10 +196,10 @@ bool same (std::vector<T> const& x, std::vector<T> const& y) {
     return true;
 }
 
-unsigned int findAllKeysBF (GameState const& initial) {
+unsigned int findAllKeysBF (Board const& board) {
     std::deque<GameState *> frontier;
     unsigned int bestFinished {UINT_MAX};
-    frontier.push_back (new GameState (initial));
+    frontier.push_back (new GameState (&board));
     unsigned int count {0U};
     unsigned int skipped {0U};
     unsigned int keys = 0;
@@ -211,7 +213,7 @@ unsigned int findAllKeysBF (GameState const& initial) {
             skipped = 0U;
         }
         if (state->movedSoFar >= bestFinished) { delete state; }
-        else if (state->foundKeys.size () == state->keyLocations.size ()) {
+        else if (state->foundKeys.size () == state->board->keyLocations.size ()) {
             if (state->movedSoFar < bestFinished) { bestFinished = state->movedSoFar; }
             delete state;
         }
@@ -242,26 +244,26 @@ unsigned int findAllKeysBF (GameState const& initial) {
     return bestFinished;
 }
 
-GameState divideMap (GameState const& original) {
-    GameState result (original);
-    Coordinate center = result.playerLocs[0];
+Board divideMap (Board const& original) {
+    Board result (original);
+    Coordinate center = result.initialPlayerLocs[0];
     result.picture[center.row][center.col] = WALL;
     result.picture[center.row - 1][center.col] = WALL;
     result.picture[center.row + 1][center.col] = WALL;
     result.picture[center.row][center.col - 1] = WALL;
     result.picture[center.row][center.col + 1] = WALL;
-    result.playerLocs[0] = {center.row - 1, center.col - 1};
-    result.playerLocs.push_back ({center.row - 1, center.col + 1});
-    result.playerLocs.push_back ({center.row + 1, center.col - 1});
-    result.playerLocs.push_back ({center.row + 1, center.col + 1});
+    result.initialPlayerLocs[0] = {center.row - 1, center.col - 1};
+    result.initialPlayerLocs.push_back ({center.row - 1, center.col + 1});
+    result.initialPlayerLocs.push_back ({center.row + 1, center.col - 1});
+    result.initialPlayerLocs.push_back ({center.row + 1, center.col + 1});
     return result;
 }
 
 int main () {
-    GameState initial = getInput ();
+    Board original = getInput ();
     //std::cout << initial << "\n";
     //std::cout << findAllKeysBF (initial) << "\n";
-    GameState revised = divideMap (initial);
+    Board revised = divideMap (original);
     std::cout << findAllKeysBF (revised) << "\n";
     return 0;
 }
