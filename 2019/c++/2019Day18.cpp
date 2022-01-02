@@ -55,11 +55,10 @@ private:
     std::size_t count;
 };
 
-inline char isKey (char c) { /*return std::islower (c);*/ return c >= 'a' && c <= 'z'; }
-//inline char isDoor (char c) { return std::isupper (c); }
-inline char isDoor (char c) { return c >= 'A' && c <= 'Z'; }
-inline char doorToKey (char c) { /*return std::tolower (c);*/ return c + ('a' - 'A'); }
-inline char keyToDoor (char c) { /*return std::toupper (c);*/ return c - ('a' - 'A'); }
+inline bool isKey (char c) { return std::islower (c); }
+inline bool isDoor (char c) { return std::isupper (c); }
+inline char doorToKey (char c) { return std::tolower (c); }
+inline char keyToDoor (char c) { return std::toupper (c); }
 
 struct Board {
     std::vector<std::vector<char>> picture;
