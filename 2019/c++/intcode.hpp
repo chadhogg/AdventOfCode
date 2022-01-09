@@ -131,6 +131,14 @@ public:
     inline unsigned int getInstPointer () const { return m_instPointer; }
     inline int getNumber (unsigned int pos) const { return readMemoryAddress (pos); }
     inline NumbersList getOutputs () const { return m_outputs; }
+    inline NumbersList getNewOutputs () {
+        NumbersList result;
+        if (m_outputs.size () > m_outputPointer) {
+            result.insert (result.end (), m_outputs.begin () + m_outputPointer, m_outputs.end ());
+            m_outputPointer = m_outputs.size ();
+        }
+        return result;
+    }
 
     std::string toString () const;
 private:
@@ -146,13 +154,14 @@ private:
     unsigned int m_inputPointer;
     NumbersList m_outputs;
     Number m_relativeBase;
+    unsigned int m_outputPointer;
 };
 
 
 
 
 ICComputer::ICComputer ()
-: m_memory {}, m_instPointer {0U}, m_terminated {true}, m_inputs {}, m_inputPointer {0U}, m_outputs {}, m_relativeBase {0U} {
+: m_memory {}, m_instPointer {0U}, m_terminated {true}, m_inputs {}, m_inputPointer {0U}, m_outputs {}, m_relativeBase {0U}, m_outputPointer {0U} {
 }
 
 ICComputer::ICComputer (NumbersList const& prog, NumbersList const& inputs)
@@ -174,6 +183,7 @@ void ICComputer::loadProgram (NumbersList const& prog, NumbersList const& inputs
     m_outputs.clear ();
     m_inputPointer = 0U;
     m_relativeBase = 0U;
+    m_outputPointer = 0U;
 }
 
 Number ICComputer::readParameter (Number instruction, unsigned int index) const {
