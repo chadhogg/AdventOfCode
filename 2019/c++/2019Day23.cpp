@@ -54,10 +54,63 @@ Number part1 (NumbersList prog) {
     }
 }
 
+Number part2 (NumbersList prog) {
+    std::array<ICComputer, NUM_COMPUTERS> computers;
+    std::array<std::queue<Packet>, NUM_COMPUTERS> waitingPackets;
+    bool natPacketValid = false;
+    bool previousNatPacketValid = false;
+    Packet natPacket;
+    Packet previousNatPacket;
+    for (std::size_t index {0U}; index < NUM_COMPUTERS; ++index) {
+        computers[index].loadProgram (prog, {(Number)index});
+        computers[index].executeUntilMissingInput ();
+    }
+    while (true) {
+        bool allIdle = true;
+        for (std::size_t index {0U}; index < NUM_COMPUTERS; ++index) {
+            if (waitingPackets[index].empty ()) {
+                computers[index].addInput (NO_PACKETS_WAITING);
+            }
+            else {
+                Packet packet = waitingPackets[index].front ();
+                waitingPackets[index].pop ();
+                computers[index].addInput (packet.X);
+                computers[index].addInput (packet.Y);
+                allIdle = false;
+            }
+            computers[index].executeUntilMissingInput ();
+            NumbersList packets = computers[index].getNewOutputs ();
+            assert (packets.size () % 3 == 0);
+            for (std::size_t pIndex {0U}; pIndex < packets.size (); pIndex += 3) {
+                if (packets[pIndex] == STOP_ADDRESS) {
+                    natPacket = {packets[pIndex + 1], packets[pIndex + 2]};
+                    natPacketValid = true;
+                }
+                else {
+                    waitingPackets[packets[pIndex]].push ({packets[pIndex + 1], packets[pIndex + 2]});
+                }
+            }
+        }
+        if (allIdle) {
+            assert (natPacketValid);
+            if (previousNatPacketValid && natPacket.Y == previousNatPacket.Y) { 
+                return natPacket.Y;
+            }
+            previousNatPacket = natPacket;
+            natPacketValid = false;
+            previousNatPacketValid = true;
+            computers[0].addInput (previousNatPacket.X);
+            computers[0].addInput (previousNatPacket.Y);
+        }
+    }
+}
+
+
 int main () {
     std::ifstream fin ("../inputs/Day23.my.input");
     NumbersList prog = parseNumbersList (read<std::string> (fin));
     fin.close ();
     std::cout << part1 (prog) << "\n";
+    std::cout << part2 (prog) << "\n";
     return 0;
 }
