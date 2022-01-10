@@ -1,6 +1,7 @@
 /// \file 2019Day22.cpp
 /// \author Chad Hogg
 /// \brief My solution to https://adventofcode.com/2019/day/22.
+/// \note I am leaving this in a broken state because I just can't spend any more time on it.
 
 #include <iostream>
 #include <cstdio>
@@ -140,6 +141,12 @@ inline unsigned long long getPositionBeforeCutNCards (unsigned long long after, 
     }
 }
 
+__int128_t powMod (__int128_t base, __int128_t exp, __int128 mod) {
+    if (exp == 0) { return 1; }
+    else if (exp % 2 == 0) { return powMod ((base * base) % mod, exp / 2, mod) % mod; }
+    else { return (base * powMod (base, exp - 1, mod)) % mod; }
+}
+
 /*
 EXAMPLE
 size of 10, increment of 3
@@ -160,6 +167,11 @@ if (new + 2size % inc == 0), then old = new + 2size / inc
 */
 
 inline unsigned long long getPositionBeforeDealWithIncrementN (unsigned long long after, unsigned long long n, unsigned long long numCards) {
+    // Finding the multiplicative inverse
+    __int128_t inverse = powMod (n, numCards - 2, numCards);
+    __int128_t before = (after * inverse) % numCards;
+    assert (after == (before * n) % numCards);
+    return (unsigned long long)before;
     // Belief: after = (before * n) % numCards
     // Belief: before = (after + factor * numCards) / n for some factor such that (after + factor * numCards) % n == 0
     // Belief: factor = after % n
@@ -169,13 +181,13 @@ inline unsigned long long getPositionBeforeDealWithIncrementN (unsigned long lon
     // For this problem: factor   =  16,970,273,710,172  (according to the factor = after % n belief)
     // I believe that this should mean that (after + remainder * numCards) % n == 0, but it does not.
     // Instead it                 =  15,294,254,074,448
-    __int64_t remainder = (__int64_t)after % (__int64_t)n;
-    __int64_t quotient = (__int64_t)after / (__int64_t)n;
-    __int64_t before = (after + remainder * numCards) / n;
-    assert (n * quotient + remainder == after);
-    assert ((before * n) % numCards == after);
+    //__int128_t remainder = (__int128_t)after % (__int128_t)n;
+    //__int128_t quotient = (__int128_t)after / (__int128_t)n;
+    //__int128_t before = (after + remainder * numCards) / n;
+    //assert (n * quotient + remainder == after);
+    //assert ((before * n) % numCards == after);
     //assert ((after + remainder % n * numCards % n) % n == 0);
-    return (unsigned long long)((after + remainder * numCards) / n);
+    //return (unsigned long long)((after + remainder * numCards) / n);
     // NOTE: Back to my original equation, but I don't have to guess the factor -- I can calculate it!
     /*
     unsigned long long factor = after % n;
@@ -339,19 +351,45 @@ void test () {
     checkCommands ({{STACK, 0}, {CUT, -4}});
 }
 
+std::vector<Action> concatenate (std::vector<Action> const& part, unsigned int times) {
+    std::vector<Action> result;
+    for (unsigned int time {0U}; time < times; ++time) {
+        for (std::size_t index {0U}; index < part.size (); ++index) {
+            result.push_back (part[index]);
+        }
+    }
+    return result;
+}
+
+std::vector<Action> concatenate (std::vector<Action> const& part1, std::vector<Action> const& part2) {
+    std::vector<Action> result;
+    for (std::size_t index {0U}; index < part1.size (); ++index) {
+        result.push_back (part1[index]);
+    }
+    for (std::size_t index {0U}; index < part2.size (); ++index) {
+        result.push_back (part2[index]);
+    }
+    return result;
+}
+
 std::vector<Action> simplify (std::vector<Action> const& commands, unsigned long long numCards, unsigned long long repetitions) {
     if (repetitions == 0) { return {}; }
-    else if (repetitions == 1) { return commands; }
+    else if (repetitions == 1) { return simplify (commands, numCards); }
     else {
-        std::vector<Action> doubled;
-        doubled.insert (doubled.end (), commands.begin (), commands.end ());
-        doubled.insert (doubled.end (), commands.begin (), commands.end ());
-        doubled = simplify (doubled, numCards);
+        if (repetitions % 2 == 0) {
+            std::vector<Action> doubled = simplify (concatenate (commands, 2), numCards);
+            return simplify (doubled, numCards, repetitions / 2);
+        }
+        else {
+            return simplify (concatenate (commands, simplify (commands, numCards, repetitions - 1)), numCards);
+        }
+        /*
         std::vector<Action> result = simplify (doubled, numCards, repetitions / 2);
         if (repetitions % 2 == 1) {
             result.insert (result.end (), commands.begin (), commands.end ());
         }
         return simplify (result, numCards);
+        */
     }
 }
 
