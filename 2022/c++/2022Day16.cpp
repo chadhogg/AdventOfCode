@@ -164,10 +164,100 @@ depthFirstSearch (const Problem& prob, const PathDistances& distances)
   return best;
 }
 
+struct DoubleState
+{
+  std::set<std::string> m_meOpenedValves;
+  std::set<std::string> m_elephantOpenedValves;
+  int m_meMinutesLeft;
+  int m_elephantMinutesLeft;
+  unsigned long m_pressureReleased;
+  std::string m_meLocation;
+  std::string m_elephantLocation;
+};
+
+void
+advanceDoubleState (const Problem& prob, DoubleState& state, int meMinutes, int elephantMinutes)
+{
+  int mePressurePerMinute = 0;
+  for (const std::string& valve : state.m_meOpenedValves)
+  {
+    mePressurePerMinute += prob.m_valves.at (valve).m_flowRate;
+  }
+  state.m_pressureReleased += meMinutes * mePressurePerMinute;
+  state.m_meMinutesLeft -= meMinutes;
+
+  int elephantPressurePerMinute = 0;
+  for (const std::string& valve : state.m_elephantOpenedValves)
+  {
+    elephantPressurePerMinute += prob.m_valves.at (valve).m_flowRate;
+  }
+  state.m_pressureReleased += elephantMinutes * elephantPressurePerMinute;
+  state.m_elephantMinutesLeft -= elephantMinutes;
+}
+
+DoubleState
+depthFirstSearch2 (const Problem& prob, const PathDistances& distances)
+{
+  DoubleState initial;
+  initial.m_meLocation = "AA";
+  initial.m_elephantLocation = "AA";
+  initial.m_meMinutesLeft = 26;
+  initial.m_elephantMinutesLeft = 26;
+  initial.m_pressureReleased = 0;
+
+  DoubleState best;
+  std::stack<DoubleState> frontier;
+  frontier.push (initial);
+  while (!frontier.empty ())
+  {
+    DoubleState current = frontier.top ();
+    frontier.pop ();
+    if (current.m_meMinutesLeft > 0)
+    {
+      for (const auto& valve : prob.m_valves)
+      {
+        if (valve.second.m_flowRate != 0 && current.m_meOpenedValves.count (valve.first) == 0)
+        {
+          DoubleState copy = current;
+          advanceDoubleState (prob, copy, distances.at (copy.m_meLocation).at (valve.first) + 1, 0);
+          copy.m_meOpenedValves.insert (valve.first);
+          copy.m_meLocation = valve.first;
+          if (copy.m_meMinutesLeft >= 0)
+          {
+            frontier.push (copy);
+          }
+        }
+      }
+      advanceDoubleState (prob, current, current.m_meMinutesLeft, 0);
+      frontier.push (current);
+    }
+    else
+    {
+      for (const auto& valve : prob.m_valves)
+      {
+        if (valve.second.m_flowRate != 0 && current.m_meOpenedValves.count (valve.first) == 0 && current.m_elephantOpenedValves.count (valve.first) == 0)
+        {
+          DoubleState copy = current;
+          advanceDoubleState (prob, copy, 0, distances.at (copy.m_elephantLocation).at (valve.first) + 1);
+          copy.m_elephantOpenedValves.insert (valve.first);
+          copy.m_elephantLocation = valve.first;
+          if (copy.m_elephantMinutesLeft >= 0)
+          {
+            frontier.push (copy);
+          }
+        }
+      }
+      advanceDoubleState (prob, current, 0, current.m_elephantMinutesLeft);
+      if (current.m_pressureReleased > best.m_pressureReleased) { best = current; }
+    }
+  }
+  return best;
+}
 
 int main () {
   Problem prob = getInput ();
   PathDistances distances = floydWarshall (prob);
   std::cout << depthFirstSearch (prob, distances).m_pressureReleased << "\n";
+  std::cout << depthFirstSearch2 (prob, distances).m_pressureReleased << "\n";
   return 0;
 }
