@@ -14,6 +14,7 @@
 #include <array>
 #include <deque>
 #include <iomanip>
+#include <unordered_map>
 
 const unsigned int WIDTH = 9;
 const unsigned int DROP_Y = 3;
@@ -30,6 +31,100 @@ struct Cave : public std::deque<Row>
 {
   Number m_erasedRows;
 };
+
+struct State
+{
+  Cave m_cave;
+  JetPattern m_pattern;
+  Block m_dropped;
+
+  bool
+  operator== (const State& b) const
+  {
+    return m_cave == b.m_cave && m_pattern == b.m_pattern && m_dropped == b.m_dropped;
+  }
+};
+
+namespace std
+{
+  template<>
+  struct hash<Row>
+  {
+    std::size_t
+    operator() (const Row& key) const
+    {
+      std::size_t result = 0;
+      for (std::size_t index = 0; index < key.size (); ++index)
+      {
+        result += (index + 1) * key[index];
+      }
+      return result;
+    }
+  };
+  std::hash<Row> rowHasher;
+
+  template<>
+  struct hash<Cave>
+  {
+    std::size_t
+    operator() (const Cave& key) const
+    {
+      std::size_t result = 0;
+      for (std::size_t index = 0; index < key.size (); ++index)
+      {
+        result += (index + 1) * rowHasher (key[index]);
+      }
+      return result;
+    }
+  };
+  std::hash<Cave> caveHasher;
+
+  template<>
+  struct hash<JetPattern>
+  {
+    std::size_t
+    operator() (const JetPattern& pattern) const
+    {
+      std::size_t result = 0;
+      std::size_t index = 0;
+      for (char c : pattern)
+      {
+        ++index;
+        result += index * c;
+      }
+      return result;
+    }
+  };
+  std::hash<JetPattern> patternHasher;
+
+  template<>
+  struct hash<Block>
+  {
+    std::size_t
+    operator() (const Block& block) const
+    {
+      switch (block)
+      {
+        case VERTICAL: return 1;
+        case PLUS: return 2;
+        case BACKL: return 3;
+        case HORIZONTAL: return 4;
+        default: return 5;
+      }
+    }
+  };
+  struct hash<Block> blockHasher;
+
+  template<>
+  struct hash<State>
+  {
+    std::size_t
+    operator() (const State& key) const
+    {
+      return caveHasher (key.m_cave) + patternHasher (key.m_pattern) + blockHasher (key.m_dropped);
+    }
+  };
+}
 
 JetPattern
 getInput ()
@@ -327,21 +422,44 @@ dropRock (Cave& cave, Block block, JetPattern& pattern)
 }
 
 Cave
-run (JetPattern pattern, unsigned long rocksToDrop)
+run (JetPattern pattern, Number rocksToDrop)
 {
   Cave cave;
   cave.push_back ({WALL, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, WALL});
   std::list<Block> blocksToDrop = {HORIZONTAL, PLUS, BACKL, VERTICAL, SQUARE};
-  unsigned long rocksDropped = 0;
+  Number rocksDropped = 0;
+  std::unordered_map<State, std::pair<Number, Number>, std::hash<State>> previousStates;
   while (rocksDropped < rocksToDrop)
   {
-    dropRock (cave, blocksToDrop.front (), pattern);
-    blocksToDrop.push_back (blocksToDrop.front ());
-    blocksToDrop.pop_front ();
-    ++rocksDropped;
-    //draw (cave);
-    //std::cout << "\n\n";
-    compactCave (cave);
+    State current {cave, pattern, blocksToDrop.front ()};
+    if (previousStates.count (current) == 0)
+    {
+      previousStates.insert ({current, {rocksDropped, cave.size () + cave.m_erasedRows}});
+      dropRock (cave, blocksToDrop.front (), pattern);
+      blocksToDrop.push_back (blocksToDrop.front ());
+      blocksToDrop.pop_front ();
+      ++rocksDropped;
+      //draw (cave);
+      //std::cout << "\n\n";
+      compactCave (cave);
+    }
+    else
+    {
+      //std::cout << "Cycle detected!\n";
+      //std::cout << "Dropped " << rocksDropped << " for " << cave.size () + cave.m_erasedRows << " rows.\n";
+      //draw (cave);
+      //std::cout << "Old entry:";
+      //std::cout << "Dropped " << previousStates[current].first << " for " << previousStates[current].second << " rows.\n";
+
+      Number droppedDiff = rocksDropped - previousStates[current].first;
+      Number rowsDiff = cave.size () + cave.m_erasedRows - previousStates[current].second;
+      Number repeats = (rocksToDrop - rocksDropped) / droppedDiff;
+      cave.m_erasedRows += rowsDiff * repeats;
+      rocksDropped += repeats * droppedDiff;
+      //std::cout << "Skipped ahead " << repeats << " cycles of " << droppedDiff << " rocks each.\n";
+      previousStates.clear ();
+    }
+    //std::cout << (rocksToDrop - rocksDropped) << " left to go.\n";
   }
   return cave;
 }
@@ -351,5 +469,12 @@ int main () {
   Cave cave = run (pattern, 2022);
   shrinkCave (cave);
   std::cout << cave.size () + cave.m_erasedRows - 1 << "\n";
+  cave = run (pattern, 1000000000000);
+  shrinkCave (cave);
+  std::cout << cave.size () + cave.m_erasedRows - 1 << "\n";
   return 0;
 }
+
+// My answers:
+// 3083
+// 1532183908048
