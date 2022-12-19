@@ -12,6 +12,8 @@
 #include <set>
 #include <stack>
 #include <array>
+#include <deque>
+#include <iomanip>
 
 const unsigned int WIDTH = 9;
 const unsigned int DROP_Y = 3;
@@ -20,9 +22,14 @@ const unsigned int MAX_BLOCK_HEIGHT = 4;
 enum Block { HORIZONTAL, PLUS, BACKL, VERTICAL, SQUARE };
 enum Space { FLOOR, WALL, ROCK, AIR, FALLING };
 
+using Number = unsigned long;
 using JetPattern = std::list<char>;
 using Row = std::array<Space, WIDTH>;
-using Cave = std::vector<Row>;
+
+struct Cave : public std::deque<Row>
+{
+  Number m_erasedRows;
+};
 
 JetPattern
 getInput ()
@@ -195,8 +202,10 @@ fallIfPossible (Cave& cave, std::size_t lowestRelevantRow)
 void
 draw (const Cave& cave)
 {
+  std::size_t lineNum = cave.size () - 1;
   for (auto iter = cave.crbegin (); iter != cave.crend (); ++iter)
   {
+    std::cout << std::setw(5) << lineNum << " ";
     for (const Space& space : *iter)
     {
       switch (space)
@@ -209,8 +218,71 @@ draw (const Cave& cave)
       }
     }
     std::cout << "\n";
+    --lineNum;
   }
+  std::cout << "  (+ " << cave.m_erasedRows << " rows that have been erased as no longer relevant.\n";
   std::cout << "\n";
+}
+
+std::size_t
+findHighestLine (Cave& cave)
+{
+  for (std::size_t leftStart = cave.size () - 1; leftStart > 0; --leftStart)
+  {
+      std::stack <std::vector<std::size_t>> partialLines;
+      if (cave[leftStart][1] == ROCK)
+      {
+        partialLines.push ({leftStart});
+        while (!partialLines.empty ())
+        {
+          std::vector<std::size_t> partial = partialLines.top ();
+          partialLines.pop ();
+          if (partial.size () == WIDTH - 2)
+          {
+            return *std::min_element (partial.begin (), partial.end ());
+          }
+          if (cave[partial.back () - 1][partial.size () + 1] == ROCK)
+          {
+            std::vector<std::size_t> down = partial;
+            down.push_back (partial.back () - 1);
+            partialLines.push (down);
+          } 
+          if (cave[partial.back () + 1][partial.size () + 1] == ROCK)
+          {
+            std::vector<std::size_t> up = partial;
+            up.push_back (partial.back () + 1);
+            partialLines.push (up);
+          } 
+          if (cave[partial.back ()][partial.size () + 1] == ROCK)
+          {
+            std::vector<std::size_t> over = partial;
+            over.push_back (partial.back ());
+            partialLines.push (over);
+          } 
+        }
+      }
+  }
+  return std::string::npos;
+}
+
+void
+compactCave (Cave& cave)
+{
+  // The idea here is that if I can make a line across the entire formation, nothing 
+  //   can ever fall below that line, and I can ignore it.  The line doesn't need to be straight, 
+  //   just connected.  My subroutine above only finds lines that never jump a vertical distance
+  //   more than 1, but hopefull is still useful.
+  std::size_t where = findHighestLine (cave);
+  if (where != std::string::npos && where > 2)
+  {
+    //draw (cave);
+    //std::cout << "Compacting all lines below line " << where << " because they are unreachable.\n";
+    cave.m_erasedRows += where - 1;
+    cave.erase (cave.begin (), cave.begin () + where);
+    cave.push_front ({WALL, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, FLOOR, WALL});
+    //draw (cave);
+    //std::cout << "\n\n";
+  }
 }
 
 void
@@ -269,6 +341,7 @@ run (JetPattern pattern, unsigned long rocksToDrop)
     ++rocksDropped;
     //draw (cave);
     //std::cout << "\n\n";
+    compactCave (cave);
   }
   return cave;
 }
@@ -277,6 +350,6 @@ int main () {
   JetPattern pattern = getInput ();
   Cave cave = run (pattern, 2022);
   shrinkCave (cave);
-  std::cout << cave.size () - 1 << "\n";
+  std::cout << cave.size () + cave.m_erasedRows - 1 << "\n";
   return 0;
 }
