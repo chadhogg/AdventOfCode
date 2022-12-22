@@ -139,24 +139,58 @@ replaceIfBetter (std::optional<State>& bestSoFar, const State& current)
 void
 findBestEndingState (const Blueprint& blueprint, const State& current, std::optional<State>& bestSoFar)
 {
+  // We've reached the end of recursion.
   if (current.m_minutesPassed == MAX_MINUTES)
   {
     replaceIfBetter (bestSoFar, current);
     return;
   }
-  if (bestSoFar && bestSoFar->m_minutesPassed == MAX_MINUTES && bestSoFar->m_stockpiles.at (GEODE) > upperBound (current))
+  // Bail on this if we've found a solution that is provably better.
+  else if (bestSoFar && bestSoFar->m_stockpiles.at (GEODE) > upperBound (current))
   {
     return;
   }
-  //std::cout << current << "\n";
-  std::map<Resource, Number> production = getProductivity (current);
-  for (std::optional<Resource> robot : std::vector<std::optional<Resource>> {GEODE, OBSIDIAN, CLAY, ORE, std::nullopt})
+  // Questionable heuristic: Whenever we can make a geode robot, we should.
+  else if (canMake (blueprint, current, GEODE))
   {
-    if (!robot || canMake (blueprint, current, *robot))
+    findBestEndingState (blueprint, advance (blueprint, current, GEODE), bestSoFar);
+  }
+  // Explore various branches.
+  else
+  {
+    int branches = 0;
+    // Only try to make obsidian robots if we don't already have enough to cover the cost of a new geode each minute.
+    if (canMake (blueprint, current, OBSIDIAN) && current.m_robots.at (OBSIDIAN) < blueprint.m_recipes.at (GEODE).m_costs.at (OBSIDIAN))
     {
-      findBestEndingState (blueprint, advance (blueprint, current, robot), bestSoFar);
+      findBestEndingState (blueprint, advance (blueprint, current, OBSIDIAN), bestSoFar);
+      ++branches;
+    }
+    // Only try to make clay robots if we don't already have enough to cover the cost of a new obsidian each minute.
+    if (canMake (blueprint, current, CLAY) && current.m_robots.at (CLAY) < blueprint.m_recipes.at (OBSIDIAN).m_costs.at (CLAY))
+    {
+      findBestEndingState (blueprint, advance (blueprint, current, CLAY), bestSoFar);
+      ++branches;
+    }
+    // Only try to make ore robots if we don't already have enough to cover the cost of a new clay / obsidian / geode each minute.
+    if (canMake (blueprint, current, ORE) && (current.m_robots.at (ORE) < blueprint.m_recipes.at (GEODE).m_costs.at (ORE) || current.m_robots.at (ORE) < blueprint.m_recipes.at (OBSIDIAN).m_costs.at (ORE) || current.m_robots.at (ORE) < blueprint.m_recipes.at (CLAY).m_costs.at (ORE)))
+    {
+      findBestEndingState (blueprint, advance (blueprint, current, ORE), bestSoFar);
+      ++branches;
+    }
+    // Defensible heuristic: If it was possible and desirable to make every robot, don't not make one.
+    if (branches < 3)
+    {
+      findBestEndingState (blueprint, advance (blueprint, current, std::nullopt), bestSoFar);
     }
   }
+  //std::cout << current << "\n";
+  //for (std::optional<Resource> robot : std::vector<std::optional<Resource>> {GEODE, OBSIDIAN, CLAY, ORE, std::nullopt})
+  //{
+  //  if (!robot || canMake (blueprint, current, *robot))
+  //  {
+  //    findBestEndingState (blueprint, advance (blueprint, current, robot), bestSoFar);
+  //  }
+  //}
 }
 
 std::map<Number, Number>
@@ -192,3 +226,7 @@ int main ()
   std::cout << computeSumOfQualityLevels (computeMaxGeodesPerBlueprint (blueprints)) << "\n";
   return 0;
 }
+
+// My answers:
+// Part 1: 1266
+// Part 2: ?
