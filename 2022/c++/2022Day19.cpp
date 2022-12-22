@@ -9,6 +9,7 @@
 #include <map>
 #include <set>
 #include <queue>
+#include <optional>
 
 using Number = unsigned long;
 
@@ -108,50 +109,54 @@ upperBound (const State& current)
   return alreadyHas + extra;
 }
 
-void
-findBestEndingState (const Blueprint& blueprint, const State& current, State& bestSoFar)
+State
+advance (const Blueprint& blueprint, const State& current, std::optional<Resource> toBuild)
 {
-  static Number pruned = 0;
-  if (current.m_minutesPassed == MAX_MINUTES)
-  {
-    if (current.m_stockpiles.at (GEODE) > bestSoFar.m_stockpiles.at (GEODE) || bestSoFar.m_minutesPassed < MAX_MINUTES)
-    {
-      bestSoFar = current;
-      //std::cout << bestSoFar << "\n";
-      //std::cout << "Pruned " << pruned << " nodes so far.\n";
-    }
-    return;
-  }
-  if (bestSoFar.m_minutesPassed == MAX_MINUTES && bestSoFar.m_stockpiles.at (GEODE) > upperBound (current))
-  {
-    ++pruned;
-    return;
-  }
-  //std::cout << current << "\n";
   std::map<Resource, Number> production = getProductivity (current);
-  for (Resource robot : std::vector<Resource> {GEODE, OBSIDIAN, CLAY, ORE})
-  {
-    if (canMake (blueprint, current, robot))
-    {
-      State next = current;
-      for (Resource thing : {ORE, CLAY, OBSIDIAN, GEODE})
-      {
-        next.m_stockpiles[thing] += production[thing];
-        next.m_stockpiles[thing] -= blueprint.m_recipes.at (robot).m_costs.at (thing);
-      }
-      ++next.m_robots[robot];
-      ++next.m_minutesPassed;
-      findBestEndingState (blueprint, next, bestSoFar);
-    }
-  }
-  // Making no robot (only reasonable if we cannot afford one, I think).
   State next = current;
   for (Resource thing : {ORE, CLAY, OBSIDIAN, GEODE})
   {
     next.m_stockpiles[thing] += production[thing];
+    if (toBuild)
+    {
+      next.m_stockpiles[thing] -= blueprint.m_recipes.at (*toBuild).m_costs.at (thing);
+    }
   }
+  if (toBuild) { ++next.m_robots[*toBuild]; }
   ++next.m_minutesPassed;
-  findBestEndingState (blueprint, next, bestSoFar);
+  return next;
+}
+
+void
+replaceIfBetter (std::optional<State>& bestSoFar, const State& current)
+{
+  if (!bestSoFar || (current.m_stockpiles.at (GEODE) > bestSoFar->m_stockpiles.at (GEODE)))
+  {
+    bestSoFar = current;
+  }
+}
+
+void
+findBestEndingState (const Blueprint& blueprint, const State& current, std::optional<State>& bestSoFar)
+{
+  if (current.m_minutesPassed == MAX_MINUTES)
+  {
+    replaceIfBetter (bestSoFar, current);
+    return;
+  }
+  if (bestSoFar && bestSoFar->m_minutesPassed == MAX_MINUTES && bestSoFar->m_stockpiles.at (GEODE) > upperBound (current))
+  {
+    return;
+  }
+  //std::cout << current << "\n";
+  std::map<Resource, Number> production = getProductivity (current);
+  for (std::optional<Resource> robot : std::vector<std::optional<Resource>> {GEODE, OBSIDIAN, CLAY, ORE, std::nullopt})
+  {
+    if (!robot || canMake (blueprint, current, *robot))
+    {
+      findBestEndingState (blueprint, advance (blueprint, current, robot), bestSoFar);
+    }
+  }
 }
 
 std::map<Number, Number>
@@ -161,10 +166,10 @@ computeMaxGeodesPerBlueprint (const std::vector<Blueprint>& blueprints)
   for (const Blueprint& bp : blueprints)
   {
     State current = {0, {{ORE, 0}, {CLAY, 0}, {OBSIDIAN, 0}, {GEODE, 0}}, {{ORE, 1}, {CLAY, 0}, {OBSIDIAN, 0}, {GEODE, 0}}};
-    State best = current;
+    std::optional<State> best = std::nullopt;
     findBestEndingState (bp, current, best);
-    results[bp.m_number] = best.m_stockpiles[GEODE];
-    std::cout << "Finished blueprint " << bp.m_number << " with result " << best.m_stockpiles[GEODE] << "\n";
+    results[bp.m_number] = best->m_stockpiles[GEODE];
+    std::cout << "Finished blueprint " << bp.m_number << " with result " << best->m_stockpiles[GEODE] << "\n";
   }
   return results;
 }
