@@ -10,30 +10,29 @@
 #include <set>
 #include <queue>
 #include <optional>
+#include <array>
 
-using Number = unsigned long;
-
-const Number MAX_MINUTES = 24;
+using Number = unsigned int;
 
 enum Resource {ORE, CLAY, OBSIDIAN, GEODE};
 
 struct Recipe
 {
   Resource m_robotType;
-  std::map<Resource, Number> m_costs;
+  std::array<Number, 4> m_costs;
 };
 
 struct Blueprint
 {
   Number m_number;
-  std::map<Resource, Recipe> m_recipes;
+  std::array<Recipe, 4> m_recipes;
 };
 
 struct State
 {
   Number m_minutesPassed;
-  std::map<Resource, Number> m_stockpiles;
-  std::map<Resource, Number> m_robots;
+  std::array<Number, 4> m_stockpiles;
+  std::array<Number, 4> m_robots;
 };
 
 std::ostream&
@@ -56,18 +55,18 @@ getInput ()
     Number clayRobotOreCost = 0;
     Number obsidianRobotOreCost = 0, obsidianRobotClayCost = 0;
     Number geodeRobotOreCost = 0, geodeRobotObsidianCost = 0;
-    if (scanf (" Blueprint %ld:", &blueprintNum) != 1) { break; }
-    if (scanf (" Each ore robot costs %ld ore.", &oreRobotOreCost) != 1) { assert (false); }
-    if (scanf (" Each clay robot costs %ld ore.", &clayRobotOreCost) != 1) { assert (false); }
-    if (scanf (" Each obsidian robot costs %ld ore and %ld clay.", &obsidianRobotOreCost, &obsidianRobotClayCost) != 2) { assert (false); }
-    if (scanf (" Each geode robot costs %ld ore and %ld obsidian.", &geodeRobotOreCost, &geodeRobotObsidianCost) != 2) { assert (false); }
+    if (scanf (" Blueprint %d:", &blueprintNum) != 1) { break; }
+    if (scanf (" Each ore robot costs %d ore.", &oreRobotOreCost) != 1) { assert (false); }
+    if (scanf (" Each clay robot costs %d ore.", &clayRobotOreCost) != 1) { assert (false); }
+    if (scanf (" Each obsidian robot costs %d ore and %d clay.", &obsidianRobotOreCost, &obsidianRobotClayCost) != 2) { assert (false); }
+    if (scanf (" Each geode robot costs %d ore and %d obsidian.", &geodeRobotOreCost, &geodeRobotObsidianCost) != 2) { assert (false); }
     assert (blueprintNum == blueprints.size () + 1);
     Blueprint current;
     current.m_number = blueprintNum;
-    current.m_recipes[ORE] = {ORE, {{ORE, oreRobotOreCost}, {CLAY, 0}, {OBSIDIAN, 0}, {GEODE, 0}}};
-    current.m_recipes[CLAY] = {CLAY, {{ORE, clayRobotOreCost}, {CLAY, 0}, {OBSIDIAN, 0}, {GEODE, 0}}};
-    current.m_recipes[OBSIDIAN] = {OBSIDIAN, {{ORE, obsidianRobotOreCost}, {CLAY, obsidianRobotClayCost}, {OBSIDIAN, 0}, {GEODE, 0}}};
-    current.m_recipes[GEODE] = {GEODE, {{ORE, geodeRobotOreCost}, {CLAY, 0}, {OBSIDIAN, geodeRobotObsidianCost}, {GEODE, 0}}};
+    current.m_recipes[ORE] = {ORE, {oreRobotOreCost, 0, 0, 0}};
+    current.m_recipes[CLAY] = {CLAY, {clayRobotOreCost, 0, 0, 0}};
+    current.m_recipes[OBSIDIAN] = {OBSIDIAN, {obsidianRobotOreCost, obsidianRobotClayCost, 0, 0}};
+    current.m_recipes[GEODE] = {GEODE, {geodeRobotOreCost, 0, geodeRobotObsidianCost, 0}};
     blueprints.push_back (current);
   }
   return blueprints;
@@ -76,31 +75,20 @@ getInput ()
 bool
 canMake (const Blueprint& blueprint, const State& current, Resource robot)
 {
-  for (const auto& pair : blueprint.m_recipes.at (robot).m_costs)
+  for (Resource r : {ORE, CLAY, OBSIDIAN})
   {
-    if (pair.second > current.m_stockpiles.at (pair.first)) { return false; }
+    if (blueprint.m_recipes[robot].m_costs[r] > current.m_stockpiles[r]) { return false; }
   }
   return true;
 }
 
-std::map<Resource, Number>
-getProductivity (const State& current)
-{
-  std::map<Resource, Number> products;
-  for (const auto& pair : current.m_robots)
-  {
-    products[pair.first] = pair.second;
-  }
-  return products;
-}
-
 Number
-upperBound (const State& current)
+upperBound (const State& current, const Number MAX_MINUTES)
 {
-  Number alreadyHas = current.m_stockpiles.at (GEODE);
-  Number increment = current.m_robots.at (GEODE);
+  Number alreadyHas = current.m_stockpiles[GEODE];
+  Number increment = current.m_robots[GEODE];
   Number extra = 0;
-  // Yeah, there's an n(n+1)/2 formula for this, but I'm hoping a bunch of additions isn't much worse than that.
+  // Yeah, there's an n(n+1)/2 formula for this, but do I trust that I have the bounds on the sum correct?
   for (Number minute = current.m_minutesPassed; minute < MAX_MINUTES; ++minute)
   {
     extra += increment;
@@ -112,14 +100,13 @@ upperBound (const State& current)
 State
 advance (const Blueprint& blueprint, const State& current, std::optional<Resource> toBuild)
 {
-  std::map<Resource, Number> production = getProductivity (current);
   State next = current;
   for (Resource thing : {ORE, CLAY, OBSIDIAN, GEODE})
   {
-    next.m_stockpiles[thing] += production[thing];
+    next.m_stockpiles[thing] += current.m_robots[thing];
     if (toBuild)
     {
-      next.m_stockpiles[thing] -= blueprint.m_recipes.at (*toBuild).m_costs.at (thing);
+      next.m_stockpiles[thing] -= blueprint.m_recipes[*toBuild].m_costs[thing];
     }
   }
   if (toBuild) { ++next.m_robots[*toBuild]; }
@@ -130,14 +117,14 @@ advance (const Blueprint& blueprint, const State& current, std::optional<Resourc
 void
 replaceIfBetter (std::optional<State>& bestSoFar, const State& current)
 {
-  if (!bestSoFar || (current.m_stockpiles.at (GEODE) > bestSoFar->m_stockpiles.at (GEODE)))
+  if (!bestSoFar || (current.m_stockpiles[GEODE] > bestSoFar->m_stockpiles[GEODE]))
   {
     bestSoFar = current;
   }
 }
 
 void
-findBestEndingState (const Blueprint& blueprint, const State& current, std::optional<State>& bestSoFar)
+findBestEndingState (const Blueprint& blueprint, const State& current, std::optional<State>& bestSoFar, const Number MAX_MINUTES)
 {
   // We've reached the end of recursion.
   if (current.m_minutesPassed == MAX_MINUTES)
@@ -146,62 +133,56 @@ findBestEndingState (const Blueprint& blueprint, const State& current, std::opti
     return;
   }
   // Bail on this if we've found a solution that is provably better.
-  else if (bestSoFar && bestSoFar->m_stockpiles.at (GEODE) > upperBound (current))
+  // Because the best in several instances is 0 or 1, this is almost never true.
+  else if (bestSoFar && bestSoFar->m_stockpiles[GEODE] > upperBound (current, MAX_MINUTES))
   {
     return;
   }
   // Questionable heuristic: Whenever we can make a geode robot, we should.
+  // Seems to not break optimality.
   else if (canMake (blueprint, current, GEODE))
   {
-    findBestEndingState (blueprint, advance (blueprint, current, GEODE), bestSoFar);
+    findBestEndingState (blueprint, advance (blueprint, current, GEODE), bestSoFar, MAX_MINUTES);
   }
   // Explore various branches.
   else
   {
     int branches = 0;
     // Only try to make obsidian robots if we don't already have enough to cover the cost of a new geode each minute.
-    if (canMake (blueprint, current, OBSIDIAN) && current.m_robots.at (OBSIDIAN) < blueprint.m_recipes.at (GEODE).m_costs.at (OBSIDIAN))
+    if (canMake (blueprint, current, OBSIDIAN) && current.m_robots[OBSIDIAN] < blueprint.m_recipes[GEODE].m_costs[OBSIDIAN])
     {
-      findBestEndingState (blueprint, advance (blueprint, current, OBSIDIAN), bestSoFar);
+      findBestEndingState (blueprint, advance (blueprint, current, OBSIDIAN), bestSoFar, MAX_MINUTES);
       ++branches;
     }
     // Only try to make clay robots if we don't already have enough to cover the cost of a new obsidian each minute.
-    if (canMake (blueprint, current, CLAY) && current.m_robots.at (CLAY) < blueprint.m_recipes.at (OBSIDIAN).m_costs.at (CLAY))
+    if (canMake (blueprint, current, CLAY) && current.m_robots[CLAY] < blueprint.m_recipes[OBSIDIAN].m_costs[CLAY])
     {
-      findBestEndingState (blueprint, advance (blueprint, current, CLAY), bestSoFar);
+      findBestEndingState (blueprint, advance (blueprint, current, CLAY), bestSoFar, MAX_MINUTES);
       ++branches;
     }
     // Only try to make ore robots if we don't already have enough to cover the cost of a new clay / obsidian / geode each minute.
-    if (canMake (blueprint, current, ORE) && (current.m_robots.at (ORE) < blueprint.m_recipes.at (GEODE).m_costs.at (ORE) || current.m_robots.at (ORE) < blueprint.m_recipes.at (OBSIDIAN).m_costs.at (ORE) || current.m_robots.at (ORE) < blueprint.m_recipes.at (CLAY).m_costs.at (ORE)))
+    if (canMake (blueprint, current, ORE) && (current.m_robots[ORE] < blueprint.m_recipes[GEODE].m_costs[ORE] || current.m_robots[ORE] < blueprint.m_recipes[OBSIDIAN].m_costs[ORE] || current.m_robots[ORE] < blueprint.m_recipes[CLAY].m_costs[ORE]))
     {
-      findBestEndingState (blueprint, advance (blueprint, current, ORE), bestSoFar);
+      findBestEndingState (blueprint, advance (blueprint, current, ORE), bestSoFar, MAX_MINUTES);
       ++branches;
     }
     // Defensible heuristic: If it was possible and desirable to make every robot, don't not make one.
     if (branches < 3)
     {
-      findBestEndingState (blueprint, advance (blueprint, current, std::nullopt), bestSoFar);
+      findBestEndingState (blueprint, advance (blueprint, current, std::nullopt), bestSoFar, MAX_MINUTES);
     }
   }
-  //std::cout << current << "\n";
-  //for (std::optional<Resource> robot : std::vector<std::optional<Resource>> {GEODE, OBSIDIAN, CLAY, ORE, std::nullopt})
-  //{
-  //  if (!robot || canMake (blueprint, current, *robot))
-  //  {
-  //    findBestEndingState (blueprint, advance (blueprint, current, robot), bestSoFar);
-  //  }
-  //}
 }
 
 std::map<Number, Number>
-computeMaxGeodesPerBlueprint (const std::vector<Blueprint>& blueprints)
+computeMaxGeodesPerBlueprint (const std::vector<Blueprint>& blueprints, const int MAX_MINUTES)
 {
   std::map<Number, Number> results;
   for (const Blueprint& bp : blueprints)
   {
-    State current = {0, {{ORE, 0}, {CLAY, 0}, {OBSIDIAN, 0}, {GEODE, 0}}, {{ORE, 1}, {CLAY, 0}, {OBSIDIAN, 0}, {GEODE, 0}}};
+    State current = {0, {0, 0, 0, 0}, {1, 0, 0, 0}};
     std::optional<State> best = std::nullopt;
-    findBestEndingState (bp, current, best);
+    findBestEndingState (bp, current, best, MAX_MINUTES);
     results[bp.m_number] = best->m_stockpiles[GEODE];
     std::cout << "Finished blueprint " << bp.m_number << " with result " << best->m_stockpiles[GEODE] << "\n";
   }
@@ -219,14 +200,26 @@ computeSumOfQualityLevels (const std::map<Number, Number>& maxGeodes)
   return total;
 }
 
+Number
+multiplyGeodeNumbers (const std::map<Number, Number>& maxGeodes)
+{
+  Number product = 1;
+  for (const auto& pair : maxGeodes)
+  {
+    product *= pair.second;
+  }
+  return product;
+}
+
 int main ()
 {
   std::vector<Blueprint> blueprints = getInput ();
-  std::cout << "Number of blueprints is: " << blueprints.size () << "\n";
-  std::cout << computeSumOfQualityLevels (computeMaxGeodesPerBlueprint (blueprints)) << "\n";
+  //std::cout << computeSumOfQualityLevels (computeMaxGeodesPerBlueprint (blueprints, 24)) << "\n";
+  blueprints.resize (3);
+  std::cout << multiplyGeodeNumbers (computeMaxGeodesPerBlueprint (blueprints, 32)) << "\n";
   return 0;
 }
 
 // My answers:
 // Part 1: 1266
-// Part 2: ?
+// Part 2: 5800
