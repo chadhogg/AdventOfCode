@@ -2,18 +2,26 @@
 /// \author Chad Hogg
 /// \brief My solution to Advent Of Code for 2022-12-20.
 
+// For the longest time I had the correct answer for the sample, wrong answer for my input.
+// This was because of an unwarranted, untrue assumption: that each number appeared exactly once.
+// Because of that assumption, the way I was keeping track of which number should be processed
+//   next was broken.
+// Now that that's resolved I could probably go back to my original linked list implementation
+//   with removal and insertion rather than swapping, but I'm not curious enough to go try it.
+
 #include <iostream>
 #include <vector>
 #include <string>
 #include <cassert>
 #include <list>
 
-using File = std::list<int>;
+using Number = long;
+using File = std::list<Number>;
 
 bool
-contains (const File& file, int value)
+contains (const File& file, Number value)
 {
-  for (int val : file)
+  for (Number val : file)
   {
     if (val == value) { return true; }
   }
@@ -24,7 +32,7 @@ File
 getInput ()
 {
   File file;
-  int number;
+  Number number;
   std::cin >> number;
   while (std::cin)
   {
@@ -47,71 +55,8 @@ to_string (const File& file)
   return result + "]";
 }
 
-/*
-Case 1: Move X forward without wrapping from Y.
-  We are currently in position Y.
-  We want to insert before position X + Y.
-  Just doing ++ Y times should work.
-Example: move the 3 in [5, 3, 2, 1, 4, 7]
-  It is at position 1.  We want to insert before position 4.
-Case 2: Move X forward from Y, needing to wrap around the end with length of Z.
-  We are currently in position Y.
-  We want to insert before position (X + Y) % (Z - 1).
-  This seems to require ++ (Y + 1) times.
-Example: move the 3 in [5, 2, 1, 4, 3, 7]
-  It is at position 4.  One ++ takes us to position 5, then to position 0, then to position 1. A fourth to position 2.
-Case 3: Move X forward from Y, passing by itself at least once.
-  We are currently in position Y.
-  We want to insert before position (X + Y) % (Z - 1).
-Example: Move the 5 in [2, 5, 1] -> [2, 1, 5] -> [5, 1, 2] -> [1, 5, 2] -> [1, 2, 5] -> [5, 2, 1]
-*/
-
-File
-naiveMix (File file)
-{
-  std::cout << to_string (file) << "\n";
-  std::cout << file.size () << "\n";
-  File mixed = file;
-  for (auto value : file)
-  {
-    auto originalLocation = mixed.begin ();
-    while (*originalLocation != value) { ++originalLocation; }
-
-    auto finalLocation = originalLocation;
-    if (value > 0)
-    {
-      int moves = value % (mixed.size () - 1);
-      for (int i = 0; i < moves; ++i)
-      {
-        ++finalLocation;
-        if (finalLocation == mixed.end ()) { finalLocation = mixed.begin (); }
-      }
-    }
-    else if (value < 0)
-    {
-      int moves = - (-value % (mixed.size () - 1));
-      for (int i = 0; i > moves; --i)
-      {
-        if (finalLocation == mixed.begin ()) { finalLocation = mixed.end (); }
-        --finalLocation;
-      }
-    }
-    std::cout << "Moving " << value << " from index " << std::distance (mixed.begin (), originalLocation) << " to index " << std::distance (mixed.begin (), finalLocation) << "\n";
-    std::cout << "I think we want to move forward " << (*originalLocation + mixed.size () * 5) % mixed.size () << "\n";
-    originalLocation = mixed.erase (originalLocation);
-    mixed.insert (finalLocation, value);
-    
-    //if (finalLocation == mixed.begin ()) { finalLocation = mixed.end (); }
-    //mixed.insert (finalLocation, *originalLocation);
-    //mixed.erase (originalLocation);
-    std::cout << to_string (mixed) << "\n";
-    
-  }
-  return mixed;
-}
-
 std::size_t
-find (const int& val, const std::vector<int*>& pointers)
+find (const Number& val, const std::vector<Number*>& pointers)
 {
   for (std::size_t index = 0; index < pointers.size (); ++index)
   {
@@ -120,78 +65,90 @@ find (const int& val, const std::vector<int*>& pointers)
   assert (false);
 }
 
-std::vector<int*>::iterator
-next (std::vector<int*>& vec, const std::vector<int*>::iterator& it)
+std::vector<Number*>::iterator
+next (std::vector<Number*>& vec, const std::vector<Number*>::iterator& it)
 {
-  std::vector<int*>::iterator copy (it);
+  std::vector<Number*>::iterator copy (it);
   ++copy;
   if (copy == vec.end ()) { copy = vec.begin (); }
   return copy;
 }
 
-std::vector<int*>::iterator
-prev (std::vector<int*>& vec, const std::vector<int*>::iterator& it)
+std::vector<Number*>::iterator
+prev (std::vector<Number*>& vec, const std::vector<Number*>::iterator& it)
 {
-  std::vector<int*>::iterator copy (it);
+  std::vector<Number*>::iterator copy (it);
   if (copy == vec.begin ()) { copy = vec.end (); }
   --copy;
   return copy;
 }
 
+// I'm not clear on why std::swap isn't working, but it's not.
 void
-mySwap (std::vector<int*>::iterator& a, std::vector<int*>::iterator& b)
+mySwap (std::vector<Number*>::iterator& a, std::vector<Number*>::iterator& b)
 {
-  int* temp = *a;
+  Number* temp = *a;
   *a = *b;
   *b = temp;
 }
 
 File
-superSlowMix (File original)
+indirectVectorMix (File original, int times)
 {
-  std::vector<int*> pointers;
+  std::vector<Number*> pointers;
   pointers.reserve (original.size ());
-  for (int& val : original)
+  for (Number& val : original)
   {
     pointers.push_back (&val);
   }
-  for (int& val : original)
+  for (int time = 0; time < times; ++time)
   {
-    std::size_t currentIndex = find (val, pointers);
-    int count = val;
-    std::vector<int*>::iterator it = pointers.begin () + currentIndex;
-    while (count > 0)
+    for (Number& val : original)
     {
-      std::vector<int*>::iterator it2 = next (pointers, it);
-      mySwap (it, it2);
-      it = it2;
-      --count;
+      std::size_t currentIndex = find (val, pointers);
+      Number count = val;
+      std::vector<Number*>::iterator it = pointers.begin () + currentIndex;
+      if (count > 0)
+      {
+        count = count % (pointers.size () - 1);
+        while (count > 0)
+        {
+          std::vector<Number*>::iterator it2 = next (pointers, it);
+          mySwap (it, it2);
+          it = it2;
+          --count;
+        }
+      }
+      else
+      {
+        count = - (-count % (pointers.size () - 1));
+        while (count < 0)
+        {
+          std::vector<Number*>::iterator it2 = prev (pointers, it);
+          mySwap (it, it2);
+          it = it2;
+          ++count;
+        }
+      }
+      //for (Number* point : pointers)
+      //{
+      //  std::cout << *point << " ";
+      //}
+      //std::cout << "\n";
     }
-    while (count < 0)
-    {
-      std::vector<int*>::iterator it2 = prev (pointers, it);
-      mySwap (it, it2);
-      it = it2;
-      ++count;
-    }
-    //for (int* point : pointers)
-    //{
-    //  std::cout << *point << " ";
-    //}
-    //std::cout << "\n";
   }
   File result;
-  for (int* point : pointers)
+  for (Number* point : pointers)
   {
     result.push_back (*point);
   }
   return result;
 }
 
-int
-part1 (const File& mixed)
+Number
+sumOfThree (const File& mixed)
 {
-  int result = 0;
+  Number result = 0;
   auto it = mixed.begin ();
   while (*it != 0) { ++it; }
   for (int outer = 0; outer < 3; ++outer)
@@ -206,15 +163,29 @@ part1 (const File& mixed)
   return result;
 }
 
+File
+applyKey (const File& original)
+{
+  File result;
+  const Number KEY = 811589153;
+  for (auto val : original)
+  {
+    result.push_back (val * KEY);
+  }
+  return result;
+}
+
 int main ()
 {
   File file = getInput ();
-  File mixed = superSlowMix (file);
-  //std::cout << to_string (mixed) << "\n";
-  std::cout << part1 (mixed) << "\n";
+  File mixed = indirectVectorMix (file, 1);
+  std::cout << sumOfThree (mixed) << "\n";
+  File decrypted = applyKey (file);
+  File manyMixed = indirectVectorMix (decrypted, 10);
+  std::cout << sumOfThree (manyMixed) << "\n";
   return 0;
 }
 
 // My answers:
 // Part 1: 1591
-// Part 2: 
+// Part 2: 14579387544492
