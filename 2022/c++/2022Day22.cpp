@@ -192,6 +192,63 @@ int main ()
   return 0;
 }
 
+// My cube:
+//     11112222
+//     11112222
+//     11112222
+//     11112222
+//     3333    
+//     3333    
+//     3333    
+//     3333    
+// 44445555    
+// 44445555    
+// 44445555    
+// 44445555    
+// 6666        
+// 6666        
+// 6666        
+// From 1: moving N goes to 6 facing W. (1, 51) -> (201, 0) and (1, 100) -> (250, 0)
+//           means X' = 150X + Y; Y' = 0
+//         moving E goes to 2 facing E. (1, 100) -> (1, 100) and (50, 100) -> (50, 100)
+//         moving S goes to 3 facing S. (50, 51) -> (50, 51) and (50, 100) -> (50, 100)
+//         moving W goes to 4 facing E. (1, 51) -> (200, 0) and (50, 51) -> (151, 0)
+//           means X' = 201 - X; Y' = 0
+// From 2: moving N goes to 6 facing N. (1, 101) -> (251, 1) and (1, 150) -> (251, 50)
+//           means X' = 251; Y' = Y - 100
+//         moving E goes to 5 facing W. (1, 150) -> (200, 101) and (50, 150) -> (151, 101)
+//           means X' = -X + 201/150; Y' = 101
+//         moving S goes to 3 facing W. (50, 101) -> (51, 101) and (50, 150) -> (100, 101)
+//           means X' = Y - 50; Y' = 101
+//         moving W goes to 1 facing W. (1, 101) -> (1, 101) and (50, 101) -> (50, 101)
+// From 3: moving N goes to 1 facing N. (51, 51) -> (51, 51) and (51, 100) -> (51, 100)
+//         moving E goes to 2 facing N. (51, 100) -> (51, 101) and (100, 100) -> (51, 150)
+//           means X' = 51; Y' = X + 50
+//         moving S goes to 5 facing S. (100, 51) -> (150, 51) and (100, 100) -> (150, 100)
+//           means X' = 150; Y' = Y
+//         moving W goes to 4 facing S. (51, 51) -> (150, 1) and (200, 51) -> (150, 50)
+//           means X' = 150; Y' = (200 - X)/149
+// From 4: moving N goes to 3 facing E. (151, 1) -> (151, 50) and (151, 50) -> (100, 50)
+//           means X' = (7450 - 51Y)/49; Y' = 50 
+//         moving E goes to 5 facing E. (151, 50) -> (151, 50) and (200, 50) -> (200, 50)
+//         moving S goes to 6 facing S. (200, 1) -> (200, 1) and (200, 50) -> (200, 50)
+//         moving W goes to 1 facing E. (151, 1) -> (50, 50) and (200, 1) -> (1, 50)
+//           means X' = -X + 201; Y' = 50
+// From 5: moving N goes to 3 facing N. (151, 51) -> (101, 51) and (151, 100) -> (101, 100)
+//           means X' = 101; Y' = Y
+//         moving E goes to 2 facing W. (151, 100) -> (50, 151) and (200, 100) -> (1, 151)
+//           means X' = -X + 201; Y' = 151
+//         moving S goes to 6 facing W. (200, 51) -> (201, 51) and (200, 100) -> (250, 51)
+//           means X' = Y + 150; Y' = 51
+//         moving W goes to 4 facing W. (151, 51) -> (151, 51) and (200, 51) -> (200, 51)
+// From 6: moving N goes to 4 facing N. (201, 1) -> (201, 1) and (201, 50) -> (201, 50)
+//         moving E goes to 5 facing N. (201, 50) -> (201, 51) and (250, 50) -> (201, 100)
+//           means X' = 201; Y' = X - 150
+//         moving S goes to 2 facing S. (250, 1) -> (0, 101) and (250, 50) -> (0, 150)
+//           means X' = 0; Y' = Y + 100
+//         moving W goes to 1 facing S. (201, 1) -> (0, 51) and (250, 1) -> (0, 100)
+//           means X' = 0; Y' = X - 150
+
 // My answers:
 // Part 1: 149250
 // Part 2: 
