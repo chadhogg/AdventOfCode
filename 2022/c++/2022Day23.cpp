@@ -95,9 +95,10 @@ draw (const std::vector<Elf> elves)
   std::cout << "\n";
 }
 
-void
+bool
 doRound (std::vector<Elf>& elves, std::list<Direction>& priorities)
 {
+  bool someoneMoved = false;
   std::set<Location> locations;
   for (const Elf& elf : elves)
   {
@@ -132,16 +133,18 @@ doRound (std::vector<Elf>& elves, std::list<Direction>& priorities)
 
   for (Elf& elf : elves)
   {
-    if (goals.count (elf.desired) == 1)
+    if ((elf.current.first != elf.desired.first || elf.current.second != elf.desired.second) && goals.count (elf.desired) == 1)
     {
       //std::cout << "(" << elf.current.first << ", " << elf.current.second << ") moves to (" << elf.desired.first << ", " << elf.desired.second << ")\n";
       elf.current = elf.desired;
+      someoneMoved = true;
     }
   }
 
   priorities.push_back (priorities.front ());
   priorities.pop_front ();
   //draw (elves);
+  return someoneMoved;
 }
 
 unsigned long
@@ -169,9 +172,12 @@ main (int argc, char* argv[])
   //draw (initial);
   for (int i = 0; i < 10; ++i) { doRound (initial, priorities); }
   std::cout << countEmptyGroundTiles (initial) << "\n";
+  long roundNumber = 11;
+  while (doRound (initial, priorities)) { ++roundNumber; }
+  std::cout << roundNumber << "\n";
   return 0;
 }
 
 // My answers:
 // Part 1: 3966
-// Part 2: 
+// Part 2: 933
