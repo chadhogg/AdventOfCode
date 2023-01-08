@@ -224,10 +224,12 @@ draw (const Problem& prob, const State& state, const Blizzards& bliz)
   std::cout << "\n\n";
 }
 
+std::vector<Blizzards> blizCache;
+
 State
 bfsSearch (const Problem& prob)
 {
-  std::vector<Blizzards> blizCache;
+  blizCache.clear ();
   blizCache.push_back (prob.initialBlizzards);
   std::set<State> stateCache;
   State initial {prob.entrance, {}};
@@ -288,6 +290,14 @@ main (int args, char* argv[])
   Problem prob = getInput ();
   State fastest = bfsSearch (prob);
   std::cout << fastest.path.size () - 1 << "\n";
+  std::swap (prob.entrance, prob.exit);
+  prob.initialBlizzards = blizCache.back ();
+  State back = bfsSearch (prob);
+  std::swap (prob.entrance, prob.exit);
+  prob.initialBlizzards = blizCache.back ();
+  State again = bfsSearch (prob);
+  std::cout << fastest.path.size () - 1 << " + " << back.path.size () - 1 << " + " << again.path.size () - 1 << " = ";
+  std::cout << fastest.path.size () + back.path.size () + again.path.size () - 3 << "\n";
 }
 
 // My answers:
