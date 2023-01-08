@@ -30,27 +30,46 @@ bool operator== (const Location& l1, const Location& l2)
   return l1.row == l2.row && l1.col == l2.col;
 }
 
+bool operator< (const Location& l1, const Location& l2)
+{
+  return l1.row < l2.row || (l1.row == l2.row && l1.col < l2.col);
+}
+
 struct Blizzard
 {
   Direction facing;
   Location where;
 };
 
+bool
+operator< (const Blizzard& b1, const Blizzard& b2)
+{
+  return b1.facing < b2.facing || (b1.facing == b2.facing && b1.where < b2.where);
+}
+
+using Blizzards = std::vector<Blizzard>;
+
 struct Problem
 {
   std::vector<std::vector<Terrain>> map;
   Location entrance;
   Location exit;
-  std::vector<Blizzard> initialBlizzards;
+  Blizzards initialBlizzards;
 };
 
 struct State
 {
   Location expedition;
-  std::vector<Blizzard> blizzards;
   std::vector<Move> path;
 };
 
+bool
+operator< (const State& s1, const State& s2)
+{
+  return s1.expedition.row < s2.expedition.row
+    || (s1.expedition.row == s2.expedition.row && s1.expedition.col < s2.expedition.col)
+    || (s1.expedition.row == s2.expedition.row && s1.expedition.col == s2.expedition.col && s1.path.size () < s2.path.size ());
+}
 
 Problem
 getInput ()
@@ -143,9 +162,9 @@ getInput ()
 }
 
 void
-moveBlizzards (const Problem& prob, State& state)
+moveBlizzards (const Problem& prob, Blizzards& all)
 {
-  for (Blizzard& bliz : state.blizzards)
+  for (Blizzard& bliz : all)
   {
     if (bliz.facing == Direction::NORTH)
     {
@@ -171,27 +190,62 @@ moveBlizzards (const Problem& prob, State& state)
 }
 
 bool
-hasNoBlizzards (const State& state, const Location& loc)
+hasNoBlizzards (const Blizzards& all, const Location& loc)
 {
-  for (const Blizzard& bliz : state.blizzards)
+  for (const Blizzard& bliz : all)
   {
     if (bliz.where == loc) { return false; }
   }
   return true;
 }
 
+void
+draw (const Problem& prob, const State& state, const Blizzards& bliz)
+{
+  for (Number row = 0; row < prob.map.size (); ++row)
+  {
+    for (Number col = 0; col < prob.map[0].size (); ++col)
+    {
+      if (prob.map[row][col] == Terrain::WALL) { std::cout << "#"; }
+      else if (state.expedition.row == row && state.expedition.col == col) { std::cout << "E"; }
+      else if (hasNoBlizzards (bliz, {row, col})) { std::cout << "."; }
+      else { std::cout << "*"; }
+    }
+    std::cout << "\n";
+  }
+  for (auto x : state.path)
+  {
+    if (x == Move::UP) { std::cout << "U "; }
+    else if (x == Move::DOWN) { std::cout << "D "; }
+    else if (x == Move::LEFT) { std::cout << "L "; }
+    else if (x == Move::RIGHT) { std::cout << "R "; }
+    else { std::cout << "W "; }
+  }
+  std::cout << "\n\n";
+}
+
 State
 bfsSearch (const Problem& prob)
 {
-  State initial {prob.entrance, prob.initialBlizzards, {}};
+  std::vector<Blizzards> blizCache;
+  blizCache.push_back (prob.initialBlizzards);
+  std::set<State> stateCache;
+  State initial {prob.entrance, {}};
   std::list<State> frontier;
   frontier.push_back (initial);
+  stateCache.insert (initial);
   while (true)
   {
     assert (!frontier.empty ());
     State current = frontier.front ();
     frontier.pop_front ();
-    moveBlizzards (prob, current);
+    if (current.path.size () >= blizCache.size ())
+    {
+      Blizzards currentBliz = blizCache[current.path.size () - 1];
+      moveBlizzards (prob, currentBliz);
+      blizCache.push_back (currentBliz);
+    }
+    const Blizzards& updatedBliz = blizCache[current.path.size ()];
     std::vector<std::pair<Location, Move>> neighbors;
     if (current.expedition.row > 0)
     {
@@ -206,12 +260,23 @@ bfsSearch (const Problem& prob)
     neighbors.push_back ({current.expedition, Move::WAIT});
     for (const auto& pair : neighbors)
     {
-      if (prob.map[pair.first.row][pair.first.col] == Terrain::OPEN && hasNoBlizzards (current, pair.first))
+      if (prob.map[pair.first.row][pair.first.col] == Terrain::OPEN && hasNoBlizzards (updatedBliz, pair.first))
       {
-        State successor {pair.first, current.blizzards, current.path};
+        State successor {pair.first, current.path};
         successor.path.push_back (pair.second);
-        if (successor.expedition == prob.exit) { return successor; }
-        else { frontier.push_back (successor); }
+        if (successor.expedition == prob.exit)
+        {
+          return successor;
+        }
+        else
+        {
+          if (stateCache.count (successor) == 0)
+          {
+            //draw (prob, successor, updatedBliz);
+            stateCache.insert (successor);
+            frontier.push_back (successor);
+          }
+        }
       }
     }
   }
@@ -222,9 +287,9 @@ main (int args, char* argv[])
 {
   Problem prob = getInput ();
   State fastest = bfsSearch (prob);
-  std::cout << fastest.path.size () << "\n";
+  std::cout << fastest.path.size () - 1 << "\n";
 }
 
 // My answers:
-// Part 1: 
+// Part 1: 245
 // Part 2: 
