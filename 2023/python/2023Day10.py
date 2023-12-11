@@ -81,10 +81,70 @@ def countLoopLength(lines: list[str]) -> int:
         moves += 1
         previous = current
         current = after
-    return moves
+    return (moves, distances)
+
+def visualize(lines: list[str]):
+    for row in range(0, len(lines)):
+        print(lines[row])
+            
+
+def expandLines(lines: list[str], distances: list[list[int]]) -> list[str]:
+    expanded = [['.' for x in range(0, len(lines[0]) * 2 + 1)] for y in range(0, len(lines) * 2 + 1)]
+    for row in range(0, len(lines)):
+        for col in range(0, len(lines[row])):
+            expanded[row * 2 + 1][col * 2 + 1] = lines[row][col]
+    for row in range(1, len(expanded), 2):
+        for col in range(2, len(expanded[row]) - 1, 2):
+            left = ((row - 1) // 2, (col - 1) // 2)
+            right = (row // 2, col // 2)
+            if distances[left[0]][left[1]] != -1 and (get(lines, left) == '-' or get(lines, left) == 'F' or get(lines, left) == 'L'):
+                expanded[row][col] = '-'
+            if distances[right[0]][right[1]] != -1 and (get(lines, right) == '-' or get(lines, right) == 'J' or get(lines, right) == '7'):
+                expanded[row][col] = '-'
+    for row in range(2, len(expanded) - 1, 2):
+        for col in range(1, len(expanded[row]), 2):
+            up = ((row - 1) // 2, (col - 1) // 2)
+            down = (row // 2, col // 2)
+            if distances[up[0]][up[1]] != -1 and (get(lines, up) == '|' or get(lines, up) == 'F' or get(lines, up) == '7'):
+                expanded[row][col] = '|'
+            if distances[down[0]][down[1]] != -1 and (get(lines, down) == '|' or get(lines, down) == 'J' or get(lines, down) == 'L'):
+                expanded[row][col] = '|'
+    return [''.join(line) for line in expanded]
+
+def fill(lines: list[str], distances: list[list[int]]) -> list[str]:
+    chars = [list(line) for line in lines]
+    for row in range(0, len(chars)):
+        for col in range(0, len(chars[row])):
+            if distances[row][col] != -1:
+                chars[row][col] = '#'
+    todo = {(0, c) for c in range(0, len(chars[0]))}
+    todo |= {(len(chars) - 1, c) for c in range(0, len(chars[0]))}
+    todo |= {(r, 0) for r in range(0, len(chars))}
+    todo |= {(r, len(chars[0]) - 1) for r in range(0, len(chars))}
+    while len(todo) > 0:
+        current = todo.pop()
+        neighbors = [(current[0] - 1, current[1]), (current[0] + 1, current[1]), (current[0], current[1] - 1), (current[0], current[1] + 1)]
+        for n in neighbors:
+            if isValid(chars, n) and chars[n[0]][n[1]] != '#' and chars[n[0]][n[1]] != 'O':
+                todo.add(n)
+        chars[current[0]][current[1]] = 'O'
+    return [''.join(line) for line in chars]
+
+def countInside(lines: list[str]) -> int:
+    sum = 0
+    for row in range(1, len(lines), 2):
+        for col in range(1, len(lines[row]), 2):
+            c = lines[row][col]
+            if c != '#' and c != 'O':
+                sum += 1
+    return sum
 
 def main():
     lines = readInput()
-    print(int(countLoopLength(lines) / 2))
+    moves, distances = countLoopLength(lines)
+    print(moves // 2)
+    expanded = expandLines(lines, distances)
+    moves, distances = countLoopLength(expanded)
+    print(countInside(fill(expanded, distances)))
 
 main()
