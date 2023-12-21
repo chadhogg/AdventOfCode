@@ -6,7 +6,7 @@ import sys
 import re
 from dataclasses import dataclass
 
-from ListOfIntRanges import IntRange, IntRangeList
+from ListOfIntRanges import IntRange, IntRangeList, Compressed2DBooleanList
 
 RIGHT = 'R'
 DOWN = 'D'
@@ -38,17 +38,16 @@ def visualize(pattern: list[list[str]]):
     for line in pattern:
         print(''.join(line))
 
-def visualize2(sparse: list[IntRangeList], edges: tuple[int, int, int, int]):
-    for index in range(len(sparse) - 1, -1, -1):
-        line = sparse[index]
+def visualize2(sparse: Compressed2DBooleanList, edges: tuple[int, int, int, int]):
+    for index in range(sparse.rows - 1, -1, -1):
+        line = sparse.getLine(index)
         output = ''
         for x in range(0, edges[3] - edges[2] + 3):
             if line.contains(x):
                 output += '#'
             else:
                 output += '.'
-        if index == 279 or index == 278 or index == 277:
-            print(output)
+        print(output)
 
 def findEdges(insts: list[Instruction]) -> tuple[int, int, int, int]:
     minY, maxY, minX, maxX = 0, 0, 0, 0
@@ -121,38 +120,45 @@ def decodeInstructions(old: list[Instruction]) -> list[Instruction]:
         results.append(Instruction(dir, dist, ''))
     return results
 
-def buildSparseMatrix(insts: list[Instruction], edges: tuple[int, int, int, int]) -> list[IntRangeList]:
-    sparseGrid = [IntRangeList() for index in range(edges[0], edges[1] + 3)]
+def buildSparseMatrix(insts: list[Instruction], edges: tuple[int, int, int, int]) -> Compressed2DBooleanList:
+    sparseGrid = Compressed2DBooleanList(edges[1] - edges[0] + 3)
     current = (-edges[0] + 1, -edges[2] + 1)
     count = 0
     for inst in insts:
         print('Finished ' + str(count / len(insts) * 100) + '%')
         count += 1
         if inst.direction == RIGHT:
-            sparseGrid[current[0]].mergeIn(IntRange(current[1], current[1] + inst.length))
+            sparseGrid.setHorizontal(current[0], current[1], current[1] + inst.length)
             current = (current[0], current[1] + inst.length)
         elif inst.direction == LEFT:
-            sparseGrid[current[0]].mergeIn(IntRange(current[1] - inst.length, current[1]))
+            sparseGrid.setHorizontal(current[0], current[1] - inst.length, current[1])
             current = (current[0], current[1] - inst.length)
         elif inst.direction == UP:
-            for i in range(0, inst.length):
-                current = (current[0] + 1, current[1])
-                sparseGrid[current[0]].mergeIn(IntRange(current[1], current[1]))
+            sparseGrid.setVertical(current[0], current[0] + inst.length, current[1])
+            current = (current[0] + inst.length, current[1])
+#            for i in range(0, inst.length):
+#                current = (current[0] + 1, current[1])
+#                sparseGrid.set(current[0], current[1])
         else:
-            for i in range(0, inst.length):
-                current = (current[0] - 1, current[1])
-                sparseGrid[current[0]].mergeIn(IntRange(current[1], current[1]))
+            sparseGrid.setVertical(current[0] - inst.length, current[0], current[1])
+            current = (current[0] - inst.length, current[1])
+#            for i in range(0, inst.length):
+#                current = (current[0] - 1, current[1])
+#                sparseGrid.set(current[0], current[1])
+        sparseGrid.compress()
     return sparseGrid
 
-def countInsideOfSparseGrid(sparseGrid: list[IntRangeList]) -> int:
+def countInsideOfSparseGrid(sparseGrid: Compressed2DBooleanList) -> int:
     total = 0
-    for y in range(len(sparseGrid) - 1, -1, -1):
+    for y in range(sparseGrid.rows - 1, -1, -1):
+        thisLine = sparseGrid.getLine(y)
+        before = sparseGrid.getLine(y - 1) if len(thisLine.ranges) > 0 else None
         index = 0
         insideStarted = -1
-        while index < len(sparseGrid[y].ranges):
-            r = sparseGrid[y].ranges[index]
-            startAbove = sparseGrid[y - 1].contains(r.low)
-            endAbove = sparseGrid[y - 1].contains(r.high)
+        while index < len(thisLine.ranges):
+            r = thisLine.ranges[index]
+            startAbove = before.contains(r.low)
+            endAbove = before.contains(r.high)
             if startAbove ^ endAbove or r.low == r.high:
                 # The two ends go in different directions, so this is the start or end of an enclosed region
                 if insideStarted == -1:
@@ -177,6 +183,8 @@ def main():
     decoded = decodeInstructions(insts)
     decEdges = findEdges(decoded)
     sparseGrid = buildSparseMatrix(decoded, decEdges)
+    #sparseGrid = buildSparseMatrix(insts, edges)
+    #visualize2(sparseGrid, edges)
     print(countInsideOfSparseGrid(sparseGrid))
 
 main()
