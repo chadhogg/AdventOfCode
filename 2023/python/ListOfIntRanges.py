@@ -1,9 +1,9 @@
 """A module that deals with efficiently tracking non-overlapping ranges of integers."""
 
 import copy
-import time
 
 class IntRange:
+    """A range of integers, from low to high inclusively."""
     def __init__(self, low: int, high: int):
         assert low <= high
         self.low = low
@@ -23,7 +23,7 @@ class IntRange:
 
 
 class IntRangeList:
-
+    """A list of non-overlapping IntRanges, in numerical order."""
     def __init__(self):
         self.ranges = []
     
@@ -93,26 +93,16 @@ class IntRangeList:
 
 
 class Compressed2DBooleanList:
+    """A list of IntRangeLists, in which consecutive duplicates are merged."""
 
     def __init__(self, rows: int):
         self.rows = rows
         self._lines = [(IntRangeList(), rows)]
 
-# row 0-0: 1 copy
-# row 1-1: 1 copy
-# row 2-8: 7 copies
-# row 9-9: 1 copy
-# row 10-20: 11 copies
-
     def setHorizontal(self, y: int, xLow: int, xHigh: int):
-        # print()
-        # print('About to insert horizontally in row %d (x %d-%d) into this:' % (y, xLow, xHigh))
-        # print(str(self))
-        # print()
         row = 0
         index = 0
         while index < len(self._lines):
-#            print('row: %d index: %d y: %d size: %d' % (row, index, y, self._lines[index][1]))
             # The row we want to change comes after this region, so keep moving.
             if y >= row + self._lines[index][1]:
                 row += self._lines[index][1]
@@ -134,38 +124,11 @@ class Compressed2DBooleanList:
                 if(before[1] > 0):
                     self._lines.insert(index, before)
                 return
-#         while row < y:
-#             print('row: %d index : %d y: %d' % (row, index, y))
-#             # We can jump past this group before hitting y --
-#             if self._lines[index][1] + row <= y:
-#                 # So make that jump.
-#                 row += self._lines[index][1]
-#                 index += 1
-#             else:
-#                 before = (copy.deepcopy(self._lines[index][0]), y - row)
-#                 single = (self._lines[index][0], 1)
-#                 after = (copy.deepcopy(self._lines[index][0]), self._lines[index][1] - (y - row) - 1)
-# #                print(str(self._lines[index]))
-#                 print(str(before))
-#                 print(str(single))
-#                 print(str(after))
-#                 self._lines[index] = single
-#                 if after[1] > 0:
-#                     self._lines.insert(index + 1, after)
-#                 if before[1] > 0:
-#                     self._lines.insert(index, before)
-#                     index += 1
-#                     row += before[1]
-#         self._lines[index][0].mergeIn(IntRange(xLow, xHigh))
     
     def _setVerticalRecurse(self, yLow: int, yHigh: int, x: int):
-#        print(str(self))
-#        print('%d %d %d' % (yLow, yHigh, x))
-#        time.sleep(5)
         index = 0
         row = 0
         while index < len(self._lines):
-#            print('yLow: %d yHigh: %d row: %d size: %d' % (yLow, yHigh, row, self._lines[index][1]))
             # The range we want to change falls entirely after this one, so move on.
             if yLow >= row + self._lines[index][1]:
                 row += self._lines[index][1]
@@ -201,45 +164,8 @@ class Compressed2DBooleanList:
         assert False
 
     def setVertical(self, yLow: int, yHigh: int, x: int):
-        # print()
-        # print('About to insert vertically in column %d (y %d-%d) into this:' % (x, yLow, yHigh))
-        # print(str(self))
-        # print()
         self._setVerticalRecurse(yLow, yHigh, x)
         self.compress()
-
-    def set(self, y: int, x: int):
-#        print('About to set (' + str(y) + ', ' + str(x) + ')')
-        row = 0
-        index = 0
-        while row < y:
-            # We can jump past this group before hitting y --
-            if self._lines[index][1] + row <= y:
-                # So make that jump.
-                row += self._lines[index][1]
-                index += 1
-            else:
-#                print('Was ' + str(self._lines[index]))
-                before = (copy.deepcopy(self._lines[index][0]), y - row)
-                single = (self._lines[index][0], 1)
-                after = (copy.deepcopy(self._lines[index][0]), self._lines[index][1] - (y - row) - 1)
-#                print('Before: ' + str(before))
-#                print('Single: ' + str(single))
-#                print('After: ' + str(after))
-                self._lines[index] = single
-                if after[1] > 0:
-                    self._lines.insert(index + 1, after)
-                if before[1] > 0:
-                    self._lines.insert(index, before)
-                    index += 1
-                    row += before[1]
-#                    print(str(self))
-#                    print(str(index) + ' ' + str(row))
-#        print('About to merge ' + str(IntRange(x, x)) + ' into ' + str(self._lines[index]))
-        self._lines[index][0].mergeIn(IntRange(x, x))
-#        print('After merging:')
-#        print(str(self))
-#        print()
 
     def compress(self):
         index = 0
@@ -262,6 +188,5 @@ class Compressed2DBooleanList:
     def __str__(self):
         output = ''
         for index in range(0, len(self._lines)):
-        #for index in range(len(self._lines) - 1, -1, -1):
             output += str(self._lines[index][0]) + ' repeated ' + str(self._lines[index][1]) + ' times\n'
         return output

@@ -1,4 +1,4 @@
-"""Chad Hogg's solution to Advent Of Code 2023, day 14
+"""Chad Hogg's solution to Advent Of Code 2023, day 18
 
 """
 
@@ -123,10 +123,7 @@ def decodeInstructions(old: list[Instruction]) -> list[Instruction]:
 def buildSparseMatrix(insts: list[Instruction], edges: tuple[int, int, int, int]) -> Compressed2DBooleanList:
     sparseGrid = Compressed2DBooleanList(edges[1] - edges[0] + 3)
     current = (-edges[0] + 1, -edges[2] + 1)
-    count = 0
     for inst in insts:
-        print('Finished ' + str(count / len(insts) * 100) + '%')
-        count += 1
         if inst.direction == RIGHT:
             sparseGrid.setHorizontal(current[0], current[1], current[1] + inst.length)
             current = (current[0], current[1] + inst.length)
@@ -136,19 +133,15 @@ def buildSparseMatrix(insts: list[Instruction], edges: tuple[int, int, int, int]
         elif inst.direction == UP:
             sparseGrid.setVertical(current[0], current[0] + inst.length, current[1])
             current = (current[0] + inst.length, current[1])
-#            for i in range(0, inst.length):
-#                current = (current[0] + 1, current[1])
-#                sparseGrid.set(current[0], current[1])
         else:
             sparseGrid.setVertical(current[0] - inst.length, current[0], current[1])
             current = (current[0] - inst.length, current[1])
-#            for i in range(0, inst.length):
-#                current = (current[0] - 1, current[1])
-#                sparseGrid.set(current[0], current[1])
         sparseGrid.compress()
     return sparseGrid
 
 def countInsideOfSparseGrid(sparseGrid: Compressed2DBooleanList) -> int:
+    # @TODO This takes 12 minutse to run on my input, and there's no reason to be getting
+    #       every line individually.  But I'm not motivated to improve it at the moment.
     total = 0
     for y in range(sparseGrid.rows - 1, -1, -1):
         thisLine = sparseGrid.getLine(y)
@@ -183,8 +176,6 @@ def main():
     decoded = decodeInstructions(insts)
     decEdges = findEdges(decoded)
     sparseGrid = buildSparseMatrix(decoded, decEdges)
-    #sparseGrid = buildSparseMatrix(insts, edges)
-    #visualize2(sparseGrid, edges)
     print(countInsideOfSparseGrid(sparseGrid))
 
 main()
