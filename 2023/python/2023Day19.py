@@ -4,7 +4,10 @@
 
 import sys
 import re
+import operator
+import functools
 from dataclasses import dataclass
+from ListOfIntRanges import IntRange
 
 @dataclass(frozen=True)
 class Condition:
@@ -33,6 +36,10 @@ class Part:
 class Problem:
     workflows: dict[str, Workflow]
     parts: list[Part]
+
+@dataclass(frozen=True)
+class PartGroup:
+    values: dict[str, IntRange]
 
 def readInput() -> Problem:
     lines = sys.stdin.readlines()
@@ -83,9 +90,47 @@ def allPossibleParts():
                 for d in range(1, 4001):
                     yield Part({'x': a, 'm': b, 'a': c, 's': d})
 
+def countWorkingParts(workflows: dict[str, Workflow], parts: PartGroup, name: str, indent: str):
+#    print('%s%s: %s' % (indent, name, str(parts)))
+    if name == 'R' or any([x.high < x.low for x in parts.values.values()]):
+        return 0
+    elif name == 'A':
+#        print('%sreturning %d' % (indent, functools.reduce(operator.mul, [(a.high - a.low + 1) for a in parts.values.values()], 1)))
+        return functools.reduce(operator.mul, [(a.high - a.low + 1) for a in parts.values.values()], 1)
+    else:
+        wf = workflows[name]
+        for rule in wf.rules:
+            if rule.cond is None:
+                return countWorkingParts(workflows, parts, rule.target, indent + ' ')
+            elif rule.cond.oper == '<':
+                # Entire range falls below, so it follows the rule
+                if parts.values[rule.cond.var].high < rule.cond.literal:
+                    return countWorkingParts(workflows, parts, rule.target)
+                # Entire range falls above, so it moves on to the next rule
+                elif parts.values[rule.cond.var].low >= rule.cond.literal:
+                    continue
+                # Part of range is below, part above, so split and recurse
+                else:
+                    below = dict(parts.values)
+                    above = dict(parts.values)
+                    below[rule.cond.var] = IntRange(parts.values[rule.cond.var].low, rule.cond.literal - 1)
+                    above[rule.cond.var] = IntRange(rule.cond.literal, parts.values[rule.cond.var].high)
+                    return countWorkingParts(workflows, PartGroup(below), rule.target, indent + ' ') + countWorkingParts(workflows, PartGroup(above), name, indent + ' ')
+            else:
+                if parts.values[rule.cond.var].low > rule.cond.literal:
+                    return countWorkingParts(workflows, parts, rule.target, indent + ' ')
+                elif parts.values[rule.cond.var].high <= rule.cond.literal:
+                    continue
+                else:
+                    below = dict(parts.values)
+                    above = dict(parts.values)
+                    above[rule.cond.var] = IntRange(rule.cond.literal + 1, parts.values[rule.cond.var].high)
+                    below[rule.cond.var] = IntRange(parts.values[rule.cond.var].low, rule.cond.literal)
+                    return countWorkingParts(workflows, PartGroup(below), name, indent + ' ') + countWorkingParts(workflows, PartGroup(above), rule.target, indent + ' ')
+
 def main():
     problem = readInput()
     print(sum([a.rating() if classify(problem.workflows, a) else 0 for a in problem.parts]))
-    print(sum([a.rating() if classify(problem.workflows, a) else 0 for a in allPossibleParts()]))
+    print(countWorkingParts(problem.workflows, PartGroup({'x': IntRange(1, 4000), 'm': IntRange(1, 4000), 'a': IntRange(1, 4000), 's': IntRange(1, 4000)}), 'in', ''))
 
 main()
