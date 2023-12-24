@@ -24,17 +24,17 @@ class Workflow:
 
 @dataclass(frozen=True)
 class Part:
-    x: int
-    m: int
-    a: int
-    s: int
+    values: dict[str, int]
+
+    def rating(self) -> int:
+        return self.values['x'] + self.values['m'] + self.values['a'] + self.values['s']
 
 @dataclass(frozen=True)
 class Problem:
     workflows: dict[str, Workflow]
     parts: list[Part]
 
-def readInput() -> list[list[int]]:
+def readInput() -> Problem:
     lines = sys.stdin.readlines()
     workflows = {}
     parts = []
@@ -57,12 +57,35 @@ def readInput() -> list[list[int]]:
             workflows[name] = Workflow(name, rules)
         else:
             match3 = re.match(r'^\{x=(\d+),m=(\d+),a=(\d+),s=(\d+)\}$', line.strip())
-            parts.append(Part(int(match3.groups()[0]), int(match3.groups()[1]), int(match3.groups()[2]), int(match3.groups()[3])))
+            parts.append(Part({'x' : int(match3.groups()[0]), 'm' : int(match3.groups()[1]), 'a' : int(match3.groups()[2]), 's' : int(match3.groups()[3])}))
     return Problem(workflows, parts)
 
+def passed(cond: Condition, part: Part) -> bool:
+    if cond == None: return True
+    elif cond.oper == '>': return part.values[cond.var] > cond.literal
+    elif cond.oper == '<': return part.values[cond.var] < cond.literal
+    else: return None
+
+def classify(workflows: dict[str, Workflow], part: Part) -> bool:
+    name: str = 'in'
+    while name != 'A' and name != 'R':
+        wf: Workflow = workflows[name]
+        for rule in wf.rules:
+            if passed(rule.cond, part):
+                name = rule.target
+                break
+    return name == 'A'
+
+def allPossibleParts():
+    for a in range(1, 4001):
+        for b in range(1, 4001):
+            for c in range(1, 4001):
+                for d in range(1, 4001):
+                    yield Part({'x': a, 'm': b, 'a': c, 's': d})
 
 def main():
     problem = readInput()
-    print(str(problem))
+    print(sum([a.rating() if classify(problem.workflows, a) else 0 for a in problem.parts]))
+    print(sum([a.rating() if classify(problem.workflows, a) else 0 for a in allPossibleParts()]))
 
 main()
