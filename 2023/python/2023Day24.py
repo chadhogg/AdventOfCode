@@ -5,6 +5,7 @@
 import sys
 import re
 import math
+import z3
 from dataclasses import dataclass
 
 @dataclass(frozen=True)
@@ -70,10 +71,24 @@ def part1(problem: list[Hailstone], minX: int, maxX: int, minY: int, maxY: int) 
                         count += 1
     return count
 
+def part2(problem: list[Hailstone]) -> int:
+    myPX, myPY, myPZ = z3.Ints("myPX myPY myPZ")
+    myVX, myVY, myVZ = z3.Ints("myVX myVY myVZ")
+    solver = z3.Solver()
+    for i in range(0, len(problem)):
+        stone: Hailstone = problem[i]
+        t = z3.Int('t%d' % (i))
+        solver.add(t >= 0)
+        solver.add(myPX + t * myVX == stone.p0.x + t * stone.v.x)
+        solver.add(myPY + t * myVY == stone.p0.y + t * stone.v.y)
+        solver.add(myPZ + t * myVZ == stone.p0.z + t * stone.v.z)
+    solver.check()
+    return solver.model()[myPX].as_long() + solver.model()[myPY].as_long() + solver.model()[myPZ].as_long()
+
 def main():
     problem: list[Hailstone] = readInput()
     # print(str(problem))
     # print(part1(problem, 7, 27, 7, 27))
     print(part1(problem, 200000000000000, 400000000000000, 200000000000000, 400000000000000))
-
+    print(part2(problem))
 main()
