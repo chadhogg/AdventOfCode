@@ -46,11 +46,34 @@ def intersect2D(h1: Hailstone, h2: Hailstone) -> tuple[float, float]:
     assert math.isclose(y, h2Slope * x + h2Intercept)
     return (x, y)
 
+def isInFuture(stone: Hailstone, point: tuple[float, float]) -> bool:
+    # Apparently this doesn't work
+    # change: float = (point[1] - stone.p0.y) / (point[0] - stone.p0.x)
+    # # True if both have the same sign
+    # return change * (stone.v.y / stone.v.x) > 0
+    if stone.v.x > 0:
+        return point[0] > stone.p0.x
+    else:
+        return point[0] < stone.p0.x
+
+def part1(problem: list[Hailstone], minX: int, maxX: int, minY: int, maxY: int) -> int:
+    count: int = 0
+    for i in range(0, len(problem)):
+        for j in range(i + 1, len(problem)):
+            result = intersect2D(problem[i], problem[j])
+            # An intersection exists
+            if result is not None:
+                # That intersection occurs in the future
+                if isInFuture(problem[i], result) and isInFuture(problem[j], result):
+                    # That intersection occurs in the test area
+                    if result[0] >= minX and result[0] <= maxX and result[1] >= minY and result[1] <= maxY:
+                        count += 1
+    return count
+
 def main():
     problem: list[Hailstone] = readInput()
-    print(str(problem))
-    print(intersect2D(problem[0], problem[1]))
-    print(intersect2D(problem[0], problem[2]))
-    print(intersect2D(problem[0], problem[3]))
+    # print(str(problem))
+    # print(part1(problem, 7, 27, 7, 27))
+    print(part1(problem, 200000000000000, 400000000000000, 200000000000000, 400000000000000))
 
 main()
