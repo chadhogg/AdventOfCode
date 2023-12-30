@@ -4,6 +4,7 @@
 
 import sys
 import re
+import functools
 from dataclasses import dataclass
 
 # A started as (1,0,1):(1,2,1), becomes (1,0,1):(1,2,1)
@@ -122,6 +123,22 @@ def part1(supports: dict[Brick, set[Brick]]) -> int:
             count += 1
     return count
 
+def totalSupported(supports: dict[Brick, set[Brick]], moved: frozenset[Brick]) -> int:
+    newFallers = set()
+    for above in supports:
+        # This block is supported by only blocks that have been disintegrated / fallen
+        if above not in moved and supports[above] and supports[above].issubset(moved):
+            newFallers.add(above)
+    if newFallers:
+        # Recurse on the bigger collection
+        return totalSupported(supports, frozenset(newFallers.union(moved)))
+    else:
+        # One of the ones that moved was disintegrated; the others fell
+        return len(moved) - 1
+
+def part2(supports: dict[Brick, set[Brick]]) -> int:
+    return sum([totalSupported(supports, {b}) for b in supports])
+
 def main():
     problem = readInput()
     # print(problem)
@@ -130,5 +147,6 @@ def main():
     supports = findSupports(settled)
     # print(supports)
     print(part1(supports))
+    print(part2(supports))
 
 main()
