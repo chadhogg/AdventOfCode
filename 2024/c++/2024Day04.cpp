@@ -9,7 +9,7 @@
 #include <algorithm>
 #include <sstream>
 #include <cassert>
-#include <map>
+#include <set>
 
 using WordGrid = std::vector<std::string>;
 
@@ -72,16 +72,16 @@ countInstances (const WordGrid& grid, const std::string& word)
   long count = 0;
   for (unsigned int row = 0; row < ROWS; ++row) {
     for (unsigned int col = 0; col < COLS; ++col) {
-      std::map<Direction, bool> possible;
-      for (int dir = HORIZ_FORWARD; dir <= DOWN_BACKWARD; ++dir) { possible[static_cast<Direction> (dir)] = true; }
+      std::set<Direction> possible;
+      for (int dir = HORIZ_FORWARD; dir <= DOWN_BACKWARD; ++dir) { possible.insert(static_cast<Direction> (dir)); }
 
-      for (unsigned plus = 0; plus < word.length (); ++plus) {
-        for (int dir = HORIZ_FORWARD; dir <= DOWN_BACKWARD; ++dir) {
-          Direction castDir = static_cast<Direction> (dir);
-          if (possible[castDir] && !stillMatches (grid, word, ROWS, COLS, row, col, plus, castDir)) { possible[castDir] = false; }
+      for (unsigned plus = 0; plus < word.length () && !possible.empty (); ++plus) {
+        for (auto it = possible.begin (); it != possible.end (); ) {
+          if (!stillMatches (grid, word, ROWS, COLS, row, col, plus, *it)) { it = possible.erase(it); }
+          else { ++it; }
         }
       }
-      for (int dir = HORIZ_FORWARD; dir <= DOWN_BACKWARD; ++dir) { count += possible[static_cast<Direction> (dir)] ? 1 : 0; }
+      count += possible.size ();
     }
   }
 
