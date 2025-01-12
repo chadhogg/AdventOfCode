@@ -1,7 +1,7 @@
 CXX = g++
 CXXFLAGS = --std=c++23 -g -Wall
 LDFLAGS =
-LDLIBS = 
+LDLIBS = -lcrypto
 
 
 .PHONY : all clean
