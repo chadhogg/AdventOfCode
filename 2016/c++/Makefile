@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = --std=c++23 -g -Wall
+CXXFLAGS = --std=c++23 -g -Wall -O3
 LDFLAGS =
 LDLIBS = -lcrypto
 
