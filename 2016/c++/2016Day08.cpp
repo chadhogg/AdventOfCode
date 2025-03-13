@@ -1,6 +1,6 @@
 /// \file 2016Day08.cpp
 /// \author Chad Hogg
-/// \brief My solution to Advent Of Code for 2015-12-08.
+/// \brief My solution to Advent Of Code for 2016-12-08.
 
 #include <iostream>
 #include <vector>
